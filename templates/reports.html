@@ -20,157 +20,98 @@
     --green:  #2d7a4f;
     --red:    #8b2020;
     --purple: #5a3080;
-    --grey:   #444;
   }
-
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
   body {
     font-family: "IBM Plex Sans", sans-serif;
-    background: var(--bg);
-    color: var(--light);
-    min-height: 100vh;
-    overflow-x: hidden;
+    background: var(--bg); color: var(--light);
+    min-height: 100vh; overflow-x: hidden;
   }
-
-  /* Grid background */
   body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
+    content: ""; position: fixed; inset: 0;
     background-image:
       linear-gradient(rgba(30,58,82,.25) 1px, transparent 1px),
       linear-gradient(90deg, rgba(30,58,82,.25) 1px, transparent 1px);
-    background-size: 40px 40px;
-    pointer-events: none;
-    z-index: 0;
+    background-size: 40px 40px; pointer-events: none; z-index: 0;
   }
-
   .wrap { position: relative; z-index: 1; max-width: 960px; margin: 0 auto; padding: 0 24px 60px; }
 
-  /* ── Header ── */
-  header {
-    border-bottom: 1px solid var(--border);
-    padding: 24px 0 20px;
-    margin-bottom: 40px;
-  }
+  header { border-bottom: 1px solid var(--border); padding: 24px 0 20px; margin-bottom: 40px; }
   .logo-row { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
   .logo-mark {
-    width: 42px; height: 42px;
-    background: var(--accent);
-    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    width: 42px; height: 42px; background: var(--accent);
+    clip-path: polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
     display: flex; align-items: center; justify-content: center;
-    font-family: "IBM Plex Mono", monospace;
-    font-weight: 600; font-size: 13px; color: var(--navy);
-    flex-shrink: 0;
+    font-family: "IBM Plex Mono",monospace; font-weight: 600; font-size: 13px; color: var(--navy); flex-shrink: 0;
   }
-  .logo-text { font-size: 11px; color: var(--dim); font-family: "IBM Plex Mono", monospace; letter-spacing: .08em; }
-  h1 { font-size: 22px; font-weight: 700; color: white; letter-spacing: -.01em; }
+  .logo-text { font-size: 11px; color: var(--dim); font-family: "IBM Plex Mono",monospace; letter-spacing: .08em; }
+  h1 { font-size: 22px; font-weight: 700; color: white; }
   .badge-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-  .badge {
-    font-size: 10px; font-family: "IBM Plex Mono", monospace;
-    padding: 3px 9px; border-radius: 3px;
-    background: var(--border); color: var(--dim); letter-spacing: .06em;
-  }
+  .badge { font-size: 10px; font-family: "IBM Plex Mono",monospace; padding: 3px 9px; border-radius: 3px; background: var(--border); color: var(--dim); letter-spacing: .06em; }
   .badge.accent { background: rgba(232,160,32,.15); color: var(--accent); }
 
-  /* ── Section cards ── */
-  .report-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    margin-bottom: 28px;
-    overflow: hidden;
-    transition: border-color .2s;
-  }
-  .report-card:hover { border-color: var(--steel); }
+  .report-card { background: var(--card); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 28px; overflow: hidden; animation: fadeUp .4s ease both; }
+  .report-card:nth-child(2) { animation-delay: .1s; }
+  @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
 
   .card-header {
-    display: flex; align-items: center; gap: 14px;
-    padding: 18px 24px;
+    display: flex; align-items: center; gap: 14px; padding: 18px 24px;
     border-bottom: 1px solid var(--border);
-    background: linear-gradient(135deg, rgba(26,58,92,.6) 0%, transparent 100%);
+    background: linear-gradient(135deg,rgba(26,58,92,.6) 0%,transparent 100%);
   }
   .card-num {
-    width: 30px; height: 30px; border-radius: 50%;
-    background: var(--accent); color: var(--navy);
-    font-family: "IBM Plex Mono", monospace; font-weight: 600; font-size: 13px;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
+    width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: var(--navy);
+    font-family: "IBM Plex Mono",monospace; font-weight: 600; font-size: 13px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   }
   .card-title { font-size: 15px; font-weight: 600; color: white; }
-  .card-sub   { font-size: 11px; color: var(--dim); font-family: "IBM Plex Mono", monospace; margin-top: 2px; }
+  .card-sub   { font-size: 11px; color: var(--dim); font-family: "IBM Plex Mono",monospace; margin-top: 2px; }
+  .card-body  { padding: 24px; }
 
-  .card-body { padding: 24px; }
-
-  /* ── Drop zone ── */
   .drop-zone {
-    border: 2px dashed var(--border);
-    border-radius: 5px;
-    padding: 32px;
-    text-align: center;
-    cursor: pointer;
-    transition: border-color .2s, background .2s;
-    position: relative;
+    border: 2px dashed var(--border); border-radius: 5px; padding: 32px;
+    text-align: center; cursor: pointer; transition: border-color .2s,background .2s; position: relative;
   }
-  .drop-zone:hover, .drop-zone.dragover {
-    border-color: var(--accent);
-    background: rgba(232,160,32,.04);
-  }
-  .drop-zone input[type=file] {
-    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
-  }
+  .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent); background: rgba(232,160,32,.04); }
+  .drop-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
   .drop-icon { font-size: 32px; margin-bottom: 10px; }
   .drop-label { font-size: 13px; color: var(--dim); }
   .drop-label strong { color: var(--accent); }
-  .drop-note  { font-size: 11px; color: #4a6a88; margin-top: 6px; font-family: "IBM Plex Mono", monospace; }
-  .file-chosen { font-size: 12px; color: var(--accent); margin-top: 10px; font-family: "IBM Plex Mono", monospace; }
+  .drop-note  { font-size: 11px; color: #4a6a88; margin-top: 6px; font-family: "IBM Plex Mono",monospace; }
+  .file-chosen { font-size: 12px; color: var(--accent); margin-top: 10px; font-family: "IBM Plex Mono",monospace; }
 
-  /* ── Generate button ── */
   .btn-generate {
-    margin-top: 16px;
-    width: 100%;
-    padding: 13px;
-    background: var(--accent);
-    color: var(--navy);
-    font-family: "IBM Plex Sans", sans-serif;
-    font-weight: 700; font-size: 13px; letter-spacing: .04em;
-    border: none; border-radius: 4px;
-    cursor: pointer; transition: opacity .2s, transform .1s;
-    text-transform: uppercase;
+    margin-top: 16px; width: 100%; padding: 13px;
+    background: var(--accent); color: var(--navy);
+    font-family: "IBM Plex Sans",sans-serif; font-weight: 700; font-size: 13px;
+    letter-spacing: .04em; border: none; border-radius: 4px;
+    cursor: pointer; transition: opacity .2s,transform .1s; text-transform: uppercase;
   }
   .btn-generate:hover:not(:disabled) { opacity: .88; }
   .btn-generate:active:not(:disabled) { transform: scale(.99); }
   .btn-generate:disabled { opacity: .4; cursor: not-allowed; }
 
-  /* ── Progress ── */
-  .progress-wrap { margin-top: 16px; display: none; }
-  .progress-bar-bg {
-    height: 4px; background: var(--border); border-radius: 2px; overflow: hidden;
+  .spinner { display: none; margin-top: 16px; text-align: center; }
+  .spinner-ring {
+    display: inline-block; width: 28px; height: 28px;
+    border: 3px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin .8s linear infinite;
   }
-  .progress-bar-fill {
-    height: 100%; background: var(--accent); border-radius: 2px;
-    width: 0%; transition: width .4s;
-    animation: pulse-bar 1.5s ease-in-out infinite alternate;
-  }
-  @keyframes pulse-bar {
-    from { opacity: .8; } to { opacity: 1; }
-  }
-  .progress-label { font-size: 11px; color: var(--dim); margin-top: 8px; font-family: "IBM Plex Mono", monospace; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner-label { font-size: 11px; color: var(--dim); margin-top: 8px; font-family: "IBM Plex Mono",monospace; }
 
-  /* ── Results ── */
+  .error-box {
+    margin-top: 14px; padding: 12px 16px;
+    background: rgba(139,32,32,.15); border: 1px solid rgba(200,60,60,.3); border-radius: 4px;
+    font-size: 12px; color: #e08080; display: none; font-family: "IBM Plex Mono",monospace;
+  }
+
   .results { margin-top: 20px; display: none; }
-  .results-title {
-    font-size: 11px; color: var(--dim); font-family: "IBM Plex Mono", monospace;
-    text-transform: uppercase; letter-spacing: .1em; margin-bottom: 12px;
-  }
+  .results-title { font-size: 11px; color: var(--dim); font-family: "IBM Plex Mono",monospace; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 12px; }
 
-  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px; }
-  .kpi-box {
-    background: var(--navy); border: 1px solid var(--border); border-radius: 4px;
-    padding: 12px 14px;
-  }
-  .kpi-label { font-size: 9px; font-family: "IBM Plex Mono", monospace; color: var(--dim); text-transform: uppercase; letter-spacing: .08em; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(130px,1fr)); gap: 10px; margin-bottom: 16px; }
+  .kpi-box { background: var(--navy); border: 1px solid var(--border); border-radius: 4px; padding: 12px 14px; }
+  .kpi-label { font-size: 9px; font-family: "IBM Plex Mono",monospace; color: var(--dim); text-transform: uppercase; letter-spacing: .08em; }
   .kpi-value { font-size: 26px; font-weight: 700; color: white; margin: 4px 0 2px; }
   .kpi-box.alert .kpi-value { color: #e05050; }
   .kpi-box.ok    .kpi-value { color: #4caf80; }
@@ -178,42 +119,23 @@
 
   .dl-row { display: flex; gap: 10px; flex-wrap: wrap; }
   .btn-dl {
-    flex: 1; min-width: 160px;
-    padding: 11px 16px;
+    flex: 1; min-width: 160px; padding: 11px 16px;
     border: 1px solid var(--border); border-radius: 4px;
     background: var(--navy); color: var(--light);
-    font-family: "IBM Plex Sans", sans-serif; font-size: 12px; font-weight: 600;
-    cursor: pointer; transition: border-color .2s, background .2s;
+    font-family: "IBM Plex Sans",sans-serif; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: border-color .2s,background .2s;
     display: flex; align-items: center; gap: 8px;
   }
   .btn-dl:hover { border-color: var(--accent); background: rgba(232,160,32,.06); color: white; }
+  .btn-dl:disabled { opacity: .5; cursor: not-allowed; }
   .btn-dl .dl-icon { font-size: 16px; }
   .btn-dl .dl-info { display: flex; flex-direction: column; text-align: left; }
-  .btn-dl .dl-name { font-size: 11px; color: var(--dim); font-family: "IBM Plex Mono", monospace; }
+  .btn-dl .dl-name { font-size: 10px; color: var(--dim); font-family: "IBM Plex Mono",monospace; margin-top: 1px; }
 
-  /* ── Error ── */
-  .error-box {
-    margin-top: 14px; padding: 12px 16px;
-    background: rgba(139,32,32,.15); border: 1px solid rgba(200,60,60,.3); border-radius: 4px;
-    font-size: 12px; color: #e08080; display: none; font-family: "IBM Plex Mono", monospace;
-  }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  @media (max-width: 600px) { .two-col { grid-template-columns: 1fr; } }
 
-  /* ── Footer ── */
-  footer {
-    margin-top: 48px; padding-top: 20px;
-    border-top: 1px solid var(--border);
-    font-size: 10px; color: #3a5570; font-family: "IBM Plex Mono", monospace;
-    display: flex; justify-content: space-between; align-items: center; flex-wrap: gap;
-    gap: 8px;
-  }
-
-  /* ── Animations ── */
-  .report-card { animation: fadeUp .4s ease both; }
-  .report-card:nth-child(2) { animation-delay: .1s; }
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(16px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
+  footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 10px; color: #3a5570; font-family: "IBM Plex Mono",monospace; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 </style>
 </head>
 <body>
@@ -235,13 +157,13 @@
     </div>
   </header>
 
-  <!-- ── Report 1: TQ & SDR ─────────────────────────────────────────── -->
-  <div class="report-card" id="card1">
+  <!-- ── Report 1: TQ & SDR ── -->
+  <div class="report-card">
     <div class="card-header">
       <div class="card-num">1</div>
       <div>
         <div class="card-title">TQ &amp; SDR Weekly Report</div>
-        <div class="card-sub">Source: COMP5_-_TQ-SDR-CR-ARN-DCR_LOG.xlsx &nbsp;·&nbsp; Sheets: TQY + SDR</div>
+        <div class="card-sub">COMP5_-_TQ-SDR-CR-ARN-DCR_LOG.xlsx &nbsp;·&nbsp; Sheets: TQY + SDR</div>
       </div>
     </div>
     <div class="card-body">
@@ -252,38 +174,53 @@
         <div class="drop-note">COMP5_-_TQ-SDR-CR-ARN-DCR_LOG.xlsx</div>
         <div class="file-chosen" id="fname1"></div>
       </div>
-      <button class="btn-generate" id="btn1" onclick="generate(1)" disabled>Generate TQ &amp; SDR Reports</button>
-      <div class="progress-wrap" id="prog1">
-        <div class="progress-bar-bg"><div class="progress-bar-fill" id="bar1"></div></div>
-        <div class="progress-label" id="prog-label1">Processing…</div>
+      <button class="btn-generate" id="btn1" onclick="loadSummary(1)" disabled>
+        Analyse &amp; Show Summary
+      </button>
+      <div class="spinner" id="spin1">
+        <div class="spinner-ring"></div>
+        <div class="spinner-label" id="spin-label1">Processing…</div>
       </div>
       <div class="error-box" id="err1"></div>
+
       <div class="results" id="res1">
-        <div class="results-title">Results</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-          <!-- TQY KPIs -->
+        <div class="two-col">
           <div>
             <div class="results-title">📗 TQ – Technical Query</div>
             <div class="kpi-grid" id="kpi-tqy"></div>
           </div>
-          <!-- SDR KPIs -->
           <div>
             <div class="results-title">📙 SDR – Specification Deviation</div>
             <div class="kpi-grid" id="kpi-sdr"></div>
           </div>
         </div>
-        <div class="dl-row" id="dl1"></div>
+        <div class="dl-row">
+          <button class="btn-dl" id="dl-tqy" onclick="downloadFile(1,'tqy')">
+            <span class="dl-icon">⬇</span>
+            <span class="dl-info">
+              <span>Download TQY Report</span>
+              <span class="dl-name" id="tqy-fname">—</span>
+            </span>
+          </button>
+          <button class="btn-dl" id="dl-sdr" onclick="downloadFile(1,'sdr')">
+            <span class="dl-icon">⬇</span>
+            <span class="dl-info">
+              <span>Download SDR Report</span>
+              <span class="dl-name" id="sdr-fname">—</span>
+            </span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- ── Report 2: COMP5 Issued Documents ───────────────────────────── -->
-  <div class="report-card" id="card2">
+  <!-- ── Report 2: COMP5 Issued Documents ── -->
+  <div class="report-card">
     <div class="card-header">
       <div class="card-num">2</div>
       <div>
         <div class="card-title">Weekly COMP5 Issued Documents Report</div>
-        <div class="card-sub">Source: COMP5_REGISTER.xlsx &nbsp;·&nbsp; Sheet: Issued Documents</div>
+        <div class="card-sub">COMP5_REGISTER.xlsx &nbsp;·&nbsp; Sheet: Issued Documents</div>
       </div>
     </div>
     <div class="card-body">
@@ -294,166 +231,172 @@
         <div class="drop-note">COMP5_REGISTER.xlsx</div>
         <div class="file-chosen" id="fname2"></div>
       </div>
-      <button class="btn-generate" id="btn2" onclick="generate(2)" disabled>Generate Issued Documents Report</button>
-      <div class="progress-wrap" id="prog2">
-        <div class="progress-bar-bg"><div class="progress-bar-fill" id="bar2"></div></div>
-        <div class="progress-label" id="prog-label2">Processing…</div>
+      <button class="btn-generate" id="btn2" onclick="loadSummary(2)" disabled>
+        Analyse &amp; Show Summary
+      </button>
+      <div class="spinner" id="spin2">
+        <div class="spinner-ring"></div>
+        <div class="spinner-label" id="spin-label2">Processing…</div>
       </div>
       <div class="error-box" id="err2"></div>
+
       <div class="results" id="res2">
-        <div class="results-title">Results</div>
+        <div class="results-title">📋 Issued Documents — This Week</div>
         <div class="kpi-grid" id="kpi-comp5"></div>
-        <div class="dl-row" id="dl2"></div>
+        <div class="dl-row">
+          <button class="btn-dl" id="dl-comp5" onclick="downloadFile(2,'comp5')">
+            <span class="dl-icon">⬇</span>
+            <span class="dl-info">
+              <span>Download Weekly Report</span>
+              <span class="dl-name" id="comp5-fname">—</span>
+            </span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
 
   <footer>
-    <span>COMP5 Document Control System &nbsp;·&nbsp; QatarEnergy LNG / Saipem JV</span>
+    <span>COMP5 Document Control · QatarEnergy LNG / Saipem JV</span>
     <span id="footer-date">—</span>
   </footer>
-
 </div>
 
 <script>
-// ── State ──────────────────────────────────────────────────────────────────
-const state = { 1: { file: null }, 2: { file: null } };
-
-// ── Date badge ─────────────────────────────────────────────────────────────
-function fmtDate(d) {
-  return d.toLocaleDateString("en-GB", { weekday:"short", day:"2-digit", month:"short", year:"numeric" });
-}
+// ── Date ───────────────────────────────────────────────────────────────────
 const now = new Date();
+const fmtDate = d => d.toLocaleDateString("en-GB",{weekday:"short",day:"2-digit",month:"short",year:"numeric"});
 document.getElementById("today-badge").textContent = fmtDate(now);
 document.getElementById("footer-date").textContent = "Generated: " + fmtDate(now);
 
-// ── Drop zone ──────────────────────────────────────────────────────────────
-[1, 2].forEach(n => {
-  const dz = document.getElementById("dz" + n);
+// ── State ──────────────────────────────────────────────────────────────────
+const files = { 1: null, 2: null };
+
+// ── Drop zones ─────────────────────────────────────────────────────────────
+[1,2].forEach(n => {
+  const dz = document.getElementById("dz"+n);
   dz.addEventListener("dragover", e => { e.preventDefault(); dz.classList.add("dragover"); });
   dz.addEventListener("dragleave", () => dz.classList.remove("dragover"));
-  dz.addEventListener("drop", e => {
-    e.preventDefault();
-    dz.classList.remove("dragover");
-    const f = e.dataTransfer.files[0];
-    if (f) setFile(n, f);
-  });
+  dz.addEventListener("drop", e => { e.preventDefault(); dz.classList.remove("dragover"); const f=e.dataTransfer.files[0]; if(f) setFile(n,f); });
 });
-
-function onFileChange(n) {
-  const input = document.getElementById("file" + n);
-  if (input.files[0]) setFile(n, input.files[0]);
+function onFileChange(n) { const f=document.getElementById("file"+n).files[0]; if(f) setFile(n,f); }
+function setFile(n,f) {
+  files[n]=f;
+  document.getElementById("fname"+n).textContent = "✓ "+f.name;
+  document.getElementById("btn"+n).disabled = false;
+  document.getElementById("res"+n).style.display = "none";
+  showError(n,"");
 }
 
-function setFile(n, f) {
-  state[n].file = f;
-  document.getElementById("fname" + n).textContent = "✓ " + f.name;
-  document.getElementById("btn" + n).disabled = false;
+// ── UI helpers ─────────────────────────────────────────────────────────────
+function showSpinner(n,show,label="Processing…") {
+  const s=document.getElementById("spin"+n);
+  s.style.display = show?"block":"none";
+  document.getElementById("spin-label"+n).textContent = label;
+}
+function showError(n,msg) {
+  const el=document.getElementById("err"+n);
+  el.style.display = msg?"block":"none";
+  el.textContent = msg?"⚠ "+msg:"";
+}
+function kpiBox(label,value,cls="") {
+  return `<div class="kpi-box ${cls}"><div class="kpi-label">${label}</div><div class="kpi-value">${value}</div></div>`;
+}
+function setBtnLoading(id,loading,label="") {
+  const b=document.getElementById(id);
+  b.disabled=loading;
+  if(label) b.querySelector("span:first-child").textContent=loading?"⏳":label;
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-function showProgress(n, show, label = "Processing…") {
-  const pw = document.getElementById("prog" + n);
-  pw.style.display = show ? "block" : "none";
-  document.getElementById("bar" + n).style.width = show ? "70%" : "0%";
-  document.getElementById("prog-label" + n).textContent = label;
-}
-function showError(n, msg) {
-  const el = document.getElementById("err" + n);
-  el.style.display = msg ? "block" : "none";
-  el.textContent = msg ? "⚠ " + msg : "";
-}
-function kpiBox(label, value, cssClass = "") {
-  return `<div class="kpi-box ${cssClass}">
-    <div class="kpi-label">${label}</div>
-    <div class="kpi-value">${value}</div>
-  </div>`;
-}
-function dlBtn(label, subLabel, jobId) {
-  return `<button class="btn-dl" onclick="download('${jobId}')">
-    <span class="dl-icon">⬇</span>
-    <span class="dl-info">
-      <span>${label}</span>
-      <span class="dl-name">${subLabel}</span>
-    </span>
-  </button>`;
-}
-async function download(jobId) {
-  window.location.href = "/download/" + jobId;
-}
+// ── Step 1: load summary (JSON only — fast) ────────────────────────────────
+async function loadSummary(n) {
+  if(!files[n]) return;
+  showError(n,"");
+  document.getElementById("res"+n).style.display="none";
+  document.getElementById("btn"+n).disabled=true;
+  showSpinner(n,true,"Analysing file…");
 
-// ── Generate Report 1: TQ & SDR ────────────────────────────────────────────
-async function generate(n) {
-  showError(n, "");
-  document.getElementById("res" + n).style.display = "none";
-
-  if (!state[n].file) { showError(n, "Please choose a file first."); return; }
-
-  document.getElementById("btn" + n).disabled = true;
-  showProgress(n, true);
-
-  const fd = new FormData();
-  fd.append("file", state[n].file);
+  const fd=new FormData(); fd.append("file",files[n]);
+  const url = n===1 ? "/api/tq-sdr/summary" : "/api/comp5/summary";
 
   try {
-    const endpoint = n === 1 ? "/api/tq-sdr" : "/api/comp5";
-    const r = await fetch(endpoint, { method: "POST", body: fd });
+    const r = await fetch(url,{method:"POST",body:fd});
     const data = await r.json();
-
-    if (!r.ok || data.error) {
-      showError(n, data.error || "Server error");
-      return;
-    }
-
-    document.getElementById("bar" + n).style.width = "100%";
-    document.getElementById("prog-label" + n).textContent = "Done!";
-
-    if (n === 1) renderTqSdr(data);
-    else         renderComp5(data);
-
-    document.getElementById("res" + n).style.display = "block";
-  } catch (e) {
-    showError(n, "Network error: " + e.message);
+    if(!r.ok||data.error){ showError(n,data.error||"Server error"); return; }
+    if(n===1) renderTqSdrKpis(data.summary);
+    else      renderComp5Kpis(data.summary, data.filename);
+    document.getElementById("res"+n).style.display="block";
+  } catch(e) {
+    showError(n,"Network error: "+e.message);
   } finally {
-    document.getElementById("btn" + n).disabled = false;
-    setTimeout(() => showProgress(n, false), 1200);
+    document.getElementById("btn"+n).disabled=false;
+    showSpinner(n,false);
   }
 }
 
-function renderTqSdr(data) {
-  const s = data.summary;
-  const tq = s.tqy, sd = s.sdr;
+// ── Step 2: download (re-submits file, gets Excel blob directly) ───────────
+async function downloadFile(n, type) {
+  if(!files[n]) { alert("Please upload the file again."); return; }
+  const btnId = type==="tqy"?"dl-tqy":type==="sdr"?"dl-sdr":"dl-comp5";
+  const btn = document.getElementById(btnId);
+  const origText = btn.querySelectorAll("span")[1].querySelector("span:first-child").textContent;
+  btn.disabled = true;
+  btn.querySelectorAll("span")[0].textContent = "⏳";
 
-  document.getElementById("kpi-tqy").innerHTML =
-    kpiBox("Issued",        tq.issued,  "") +
-    kpiBox("Not Replied ✓", tq.valid,   "ok") +
-    kpiBox("Expired ⚠",     tq.expired, tq.expired > 0 ? "alert" : "ok") +
-    kpiBox("Replied Closed", tq.closed, "") +
-    kpiBox("Replied Open",  tq.repopen, tq.repopen > 0 ? "warn" : "");
+  const urls = { tqy:"/api/tq-sdr/tqy", sdr:"/api/tq-sdr/sdr", comp5:"/api/comp5/download" };
+  const fd = new FormData(); fd.append("file", files[n]);
 
-  document.getElementById("kpi-sdr").innerHTML =
-    kpiBox("Issued",        sd.issued,  "") +
-    kpiBox("Not Replied ✓", sd.valid,   "ok") +
-    kpiBox("Expired ⚠",     sd.expired, sd.expired > 0 ? "alert" : "ok") +
-    kpiBox("Replied Closed", sd.closed, "") +
-    kpiBox("Replied Open",  sd.repopen, sd.repopen > 0 ? "warn" : "");
+  try {
+    const r = await fetch(urls[type],{method:"POST",body:fd});
+    if(!r.ok){ const t=await r.text(); showError(n,t||"Download failed"); return; }
 
-  document.getElementById("dl1").innerHTML =
-    dlBtn("Download TQY Report", data.tqy.filename, data.tqy.job_id) +
-    dlBtn("Download SDR Report", data.sdr.filename, data.sdr.job_id);
+    // Extract filename from Content-Disposition header
+    const cd = r.headers.get("Content-Disposition")||"";
+    const match = cd.match(/filename[^;=\n]*=(?:(\\?['"])(.*?)\1|(?:[^\s]+'.*?')?([^;\n]*))/);
+    const fname = match ? (match[2]||match[3]||"report.xlsx").trim() : "report.xlsx";
+
+    const blob = await r.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href=url; a.download=fname; document.body.appendChild(a);
+    a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  } catch(e) {
+    showError(n,"Download error: "+e.message);
+  } finally {
+    btn.disabled=false;
+    btn.querySelectorAll("span")[0].textContent="⬇";
+  }
 }
 
-function renderComp5(data) {
-  const s = data.summary;
-  document.getElementById("kpi-comp5").innerHTML =
-    kpiBox("This Week",   s.count_week, s.count_week > 0 ? "ok" : "") +
-    kpiBox("Total Issued", s.count_all, "") +
-    kpiBox("Week Period",  s.week.replace("–","–"), "");
+// ── Render KPI cards ───────────────────────────────────────────────────────
+function renderTqSdrKpis(s) {
+  const tq=s.tqy, sd=s.sdr;
+  document.getElementById("kpi-tqy").innerHTML =
+    kpiBox("Issued (by Sai)",      tq.issued)  +
+    kpiBox("Not Replied ✓",        tq.valid,   "ok") +
+    kpiBox("Expired ⚠",            tq.expired, tq.expired>0?"alert":"ok") +
+    kpiBox("Replied — Closed",     tq.closed)  +
+    kpiBox("Replied — Open",       tq.repopen, tq.repopen>0?"warn":"");
+  document.getElementById("kpi-sdr").innerHTML =
+    kpiBox("Issued (by Sai)",      sd.issued)  +
+    kpiBox("Not Replied ✓",        sd.valid,   "ok") +
+    kpiBox("Expired ⚠",            sd.expired, sd.expired>0?"alert":"ok") +
+    kpiBox("Replied — Closed",     sd.closed)  +
+    kpiBox("Replied — Open",       sd.repopen, sd.repopen>0?"warn":"");
 
-  document.getElementById("dl2").innerHTML =
-    dlBtn("Download Weekly Report", data.filename, data.job_id);
+  // Set filenames on buttons
+  const d=new Date(); const ds=d.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"});
+  document.getElementById("tqy-fname").textContent = "COMP5_TQY_Report_"+ds+".xlsx";
+  document.getElementById("sdr-fname").textContent = "COMP5_SDR_Report_"+ds+".xlsx";
+}
+
+function renderComp5Kpis(s, filename) {
+  document.getElementById("kpi-comp5").innerHTML =
+    kpiBox("This Week",   s.count_week, s.count_week>0?"ok":"") +
+    kpiBox("Total Issued",s.count_all)  +
+    kpiBox("Week Period", s.week.replace("–","–"));
+  document.getElementById("comp5-fname").textContent = filename||"—";
 }
 </script>
 </body>
 </html>
-
