@@ -53,15 +53,21 @@ def _h(ws, r, c, lbl, bg=DARK_BLUE, fg=WHITE, sz=9):
     return _c(ws, r, c, lbl, bold=True, fg=fg, bg=bg, align="center", wrap=True, sz=sz)
 
 def _fmt(v):
-    if v is None or (isinstance(v, float) and str(v) in ("nan","inf","-inf")):
+    if v is None:
         return ""
-    if isinstance(v, (datetime, date)):
-        return v.strftime("%d-%b-%Y") if hasattr(v,"strftime") else str(v)
+    # Must check pd.NaT BEFORE isinstance(datetime) — NaT passes that check
     try:
         if pd.isna(v):
             return ""
-    except Exception:
+    except (TypeError, ValueError):
         pass
+    if isinstance(v, float) and str(v) in ("nan", "inf", "-inf"):
+        return ""
+    if isinstance(v, (datetime, date, pd.Timestamp)):
+        try:
+            return v.strftime("%d-%b-%Y")
+        except (ValueError, AttributeError):
+            return ""
     return str(v).strip()
 
 def _wb_bytes(wb):
@@ -334,10 +340,16 @@ def _build_tqsdr_summary(wb, title, header_color, kpis, disc_col,
             _c(ws, ri2, 2, _fmt(row_data.get("Document Number","")), bg="FFCCCC")
             _c(ws, ri2, 3, _fmt(row_data.get("Discipline","")),      bg="FFCCCC")
             due = pd.to_datetime(row_data.get("RESPOND DUE DATE"), errors="coerce")
-            _c(ws, ri2, 4, _fmt(due), bg="FFCCCC", align="center")
-            from datetime import date as ddate
             today_d = datetime.today().date()
-            days_over = (today_d - due.date()).days if not pd.isna(due) else ""
+            due_fmt = ""
+            days_over = ""
+            if due is not None and not pd.isna(due):
+                try:
+                    due_fmt = due.strftime("%d-%b-%Y")
+                    days_over = (today_d - due.date()).days
+                except (ValueError, AttributeError):
+                    pass
+            _c(ws, ri2, 4, due_fmt, bg="FFCCCC", align="center")
             ov_cell = _c(ws, ri2, 5, f"OVERDUE {days_over}d" if days_over != "" else "", bg="FFCCCC", align="center")
             ov_cell.font = Font(name="Calibri", bold=True, color="C00000", size=9)
             _c(ws, ri2, 6, _fmt(row_data.get("Responsible Engineer","")), bg="FFCCCC")
