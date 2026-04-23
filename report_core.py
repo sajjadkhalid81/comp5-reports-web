@@ -16,7 +16,7 @@ from openpyxl.utils import get_column_letter
 WHITE     = "FFFFFF"
 BLACK     = "000000"
 DARK_BLUE = "1F3864"
-MID_BLUE  = "2E75B6"
+MID_BLUE  = "1F4E79"
 LT_BLUE   = "DEEAF1"
 DK_GREEN  = "375623"
 LT_GREEN  = "E2EFDA"
@@ -41,7 +41,7 @@ def _b(med=False):
 def _c(ws, r, c, v="", bold=False, fg=BLACK, bg=None,
         align="left", wrap=False, sz=9, brd=True):
     cell = ws.cell(row=r, column=c, value=v)
-    cell.font      = Font(name="Calibri", bold=bold, color=fg, size=sz)
+    cell.font      = Font(name="Arial", bold=bold, color=fg, size=sz)
     cell.alignment = Alignment(horizontal=align, vertical="center", wrap_text=wrap)
     if bg:
         cell.fill = PatternFill("solid", fgColor=bg)
@@ -174,6 +174,11 @@ def categorise(df, transmittal_col, date_replied_col, response_col,
 
     # Only include docs that have a real transmittal number (not blank/whitespace/nan/-)
     def _has_transmittal(series):
+        """
+        Only count if transmittal has a real value (not blank, space, NaN, dash).
+        With PDC docs may have space-only values — exclude them.
+        Not Received docs have NaN — exclude them.
+        """
         s = series.fillna("").astype(str).str.strip()
         return s.notna() & (s != "") & (s != "nan") & (s != "NaN") & (s != "-") & (s != "–")
 
@@ -253,7 +258,7 @@ def _build_tqsdr_summary(wb, title, header_color, kpis, disc_col,
     ws.merge_cells("A1:F1")
     c = ws["A1"]
     c.value     = title
-    c.font      = Font(name="Calibri", bold=True, size=14, color=WHITE)
+    c.font      = Font(name="Arial", bold=True, size=14, color=WHITE)
     c.fill      = PatternFill("solid", fgColor=header_color)
     c.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[1].height = 36
@@ -262,52 +267,58 @@ def _build_tqsdr_summary(wb, title, header_color, kpis, disc_col,
     ws.merge_cells("A2:F2")
     d = ws["A2"]
     d.value     = f"Report Date: {report_date_str}"
-    d.font      = Font(name="Calibri", italic=True, size=10, color=GREY595)
+    d.font      = Font(name="Arial", italic=True, size=10, color=GREY595)
     d.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[2].height = 18
 
     # KPI boxes: 3 on top row (R4-9), 2 on bottom row (R11-16)
     # Each box: label rows span 3 rows, count rows span 3 rows
     # Columns: A:B, C:D, E:F
-    BOX_POS = [(4,1,2),(4,3,4),(4,5,6),(11,1,2),(11,3,4)]
+    BOX_POS = [(4,1),(4,2),(4,3),(4,4),(4,5)]
     for i, (label, count, fg, bg) in enumerate(kpis):
-        row, cs, ce = BOX_POS[i]
-        # Label cell (rows row to row+2)
-        ws.merge_cells(start_row=row,   start_column=cs, end_row=row+2, end_column=ce)
-        lc = ws.cell(row, cs, label)
-        lc.font      = Font(name="Calibri", bold=True, size=10, color=fg)
+        row, col_idx = BOX_POS[i][0], BOX_POS[i][1]
+        # Label cell (row 4)
+        lc = ws.cell(row, col_idx, label)
+        lc.font      = Font(name="Arial", bold=True, size=10, color=WHITE)
         lc.fill      = PatternFill("solid", fgColor=bg)
         lc.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        for r2 in range(row, row+3):
-            for c2 in range(cs, ce+1):
-                ws.cell(r2, c2).border = _b()
-        # Count cell (rows row+3 to row+5)
-        ws.merge_cells(start_row=row+3, start_column=cs, end_row=row+5, end_column=ce)
-        nc = ws.cell(row+3, cs, count)
-        nc.font      = Font(name="Calibri", bold=True, size=28, color=fg)
-        nc.fill      = PatternFill("solid", fgColor=bg)
+        lc.border    = _b()
+        # Count cell (row 5)
+        nc = ws.cell(row+1, col_idx, count)
+        nc.font      = Font(name="Arial", bold=True, size=28, color=bg)
+        nc_bg_map = {
+            "1F4E79": "BDD7EE", "1F7A3C": "C6EFCE", "C00000": "FFCCCC",
+            GREY595: "E0E0E0", PURPLE: "E2CFEF", "7B3F00": "FCE4D6",
+        }
+        nc.fill = PatternFill("solid", fgColor=nc_bg_map.get(bg, "EBF3FB"))
+        nc.font = Font(name="Arial", bold=True, size=28, color=bg)
         nc.alignment = Alignment(horizontal="center", vertical="center")
-        for r2 in range(row+3, row+6):
-            for c2 in range(cs, ce+1):
-                ws.cell(r2, c2).border = _b()
+        nc.border    = _b()
+
+    # Col 6 must be blank — only 5 KPI boxes
+    for rr in [4, 5]:
+        c6 = ws.cell(rr, 6)
+        c6.value = None
+        c6.border = Border()
+        c6.fill   = PatternFill(fill_type=None)
 
     for col in range(1, 7):
-        ws.column_dimensions[get_column_letter(col)].width = 18
-    for r in range(3, 18):
-        ws.row_dimensions[r].height = 16
+        ws.column_dimensions[get_column_letter(col)].width = 20
+    ws.row_dimensions[4].height = 32
+    ws.row_dimensions[5].height = 44
 
     # Row 18: Discipline breakdown banner
-    DISC_HDR_ROW = 19
-    ws.merge_cells(f"A18:F18")
-    banner = ws.cell(18, 1, "DISCIPLINE BREAKDOWN")
-    banner.font      = Font(name="Calibri", bold=True, size=11, color=WHITE)
+    DISC_HDR_ROW = 8
+    ws.merge_cells(f"A7:F7")
+    banner = ws.cell(7, 1, "DISCIPLINE BREAKDOWN")
+    banner.font      = Font(name="Arial", bold=True, size=11, color=WHITE)
     banner.fill      = PatternFill("solid", fgColor=header_color)
     banner.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[18].height = 20
 
     # Row 19: Disc table column headers — "ISSUED" not "ISSUED (by Sai)"
     disc_headers = [
-        "Discipline", "ISSUED", "NOT REPLIED\n(Not Exp.)",
+        "Discipline", "ISSUED\n(by Sai)", "NOT REPLIED\n(Not Exp.)",
         "NOT REPLIED\n(Expired)", "REPLIED\nCLOSED", "REPLIED\nOPEN"
     ]
     for ci, h in enumerate(disc_headers, 1):
@@ -340,43 +351,55 @@ def _build_tqsdr_summary(wb, title, header_color, kpis, disc_col,
         exp_cnt = cnt(not_rep_e)
         cell_exp = _c(ws, ri, 4, exp_cnt, bg="FFCCCC" if exp_cnt > 0 else bg, align="center")
         if exp_cnt > 0:
-            cell_exp.font = Font(name="Calibri", bold=True, color="C00000", size=9)
+            cell_exp.font = Font(name="Arial", bold=True, color="C00000", size=9)
         _c(ws, ri, 5, cnt(rep_closed), bg=bg, align="center")
         _c(ws, ri, 6, cnt(rep_open),   bg=bg, align="center")
         ws.row_dimensions[ri].height = 14
-    # NO total row — removed by manager
+    # TOTAL row
+    total_row = DISC_HDR_ROW + len(all_discs) + 1
+    def total_cnt(df_):
+        if disc_col and disc_col in df_.columns:
+            return len(df_)
+        return 0
+    _c(ws, total_row, 1, "TOTAL", bg=header_color, bold=True, fg=WHITE, align="center")
+    _c(ws, total_row, 2, total_cnt(issued),    bg=header_color, bold=True, fg=WHITE, align="center")
+    _c(ws, total_row, 3, total_cnt(not_rep_v), bg=header_color, bold=True, fg=WHITE, align="center")
+    _c(ws, total_row, 4, total_cnt(not_rep_e), bg="C00000" if total_cnt(not_rep_e)>0 else header_color, bold=True, fg=WHITE, align="center")
+    _c(ws, total_row, 5, total_cnt(rep_closed),bg=header_color, bold=True, fg=WHITE, align="center")
+    _c(ws, total_row, 6, total_cnt(rep_open),  bg=header_color, bold=True, fg=WHITE, align="center")
+    ws.row_dimensions[total_row].height = 18
 
     # Expired urgent table (only if expired records exist)
     if len(not_rep_e) > 0 and disc_col and disc_col in not_rep_e.columns:
         urgent_row = DISC_HDR_ROW + len(all_discs) + 3
-        ws.merge_cells(f"A{urgent_row}:F{urgent_row}")
+        ws.merge_cells(f"A{urgent_row}:G{urgent_row}")
         urg = ws.cell(urgent_row, 1, "⚠  EXPIRED — URGENT ACTION REQUIRED")
-        urg.font      = Font(name="Calibri", bold=True, size=11, color=WHITE)
+        urg.font      = Font(name="Arial", bold=True, size=11, color=WHITE)
         urg.fill      = PatternFill("solid", fgColor="C00000")
         urg.alignment = Alignment(horizontal="center", vertical="center")
         ws.row_dimensions[urgent_row].height = 22
-        for ci, h in enumerate(["#","Document Number","Discipline","Due Date","Days Overdue","Responsible Eng."], 1):
+        for ci, h in enumerate(["#","Document Number","Discipline","Engineer","Date Issued to CPY","Due Date","Days Overdue"], 1):
             _h(ws, urgent_row+1, ci, h, bg="C00000")
         doc_col_name = "Document Number"
         ue_cols = ["Document Number","Discipline","RESPOND DUE DATE","DATE REPLIED","Responsible Engineer"]
         for ri2, (_, row_data) in enumerate(not_rep_e.iterrows(), urgent_row+2):
-            _c(ws, ri2, 1, ri2-(urgent_row+1), bg="FFCCCC", align="center")
-            _c(ws, ri2, 2, _fmt(row_data.get("Document Number","")), bg="FFCCCC")
-            _c(ws, ri2, 3, _fmt(row_data.get("Discipline","")),      bg="FFCCCC")
             due = pd.to_datetime(row_data.get("RESPOND DUE DATE"), errors="coerce")
+            issued_date = pd.to_datetime(row_data.get("DATE ISSUE TO CPY"), errors="coerce")
             today_d = datetime.today().date()
-            due_fmt = ""
+            due_fmt = _fmt(due) if due is not None and not pd.isna(due) else ""
+            issued_fmt = _fmt(issued_date) if issued_date is not None and not pd.isna(issued_date) else ""
             days_over = ""
             if due is not None and not pd.isna(due):
-                try:
-                    due_fmt = due.strftime("%d-%b-%Y")
-                    days_over = (today_d - due.date()).days
-                except (ValueError, AttributeError):
-                    pass
-            _c(ws, ri2, 4, due_fmt, bg="FFCCCC", align="center")
-            ov_cell = _c(ws, ri2, 5, f"OVERDUE {days_over}d" if days_over != "" else "", bg="FFCCCC", align="center")
-            ov_cell.font = Font(name="Calibri", bold=True, color="C00000", size=9)
-            _c(ws, ri2, 6, _fmt(row_data.get("Responsible Engineer","")), bg="FFCCCC")
+                try: days_over = (today_d - due.date()).days
+                except (ValueError, AttributeError): pass
+            _c(ws, ri2, 1, ri2-(urgent_row+1), bg="FFCCCC", align="center", bold=True)
+            _c(ws, ri2, 2, _fmt(row_data.get("Document Number","")),  bg="FFCCCC")
+            _c(ws, ri2, 3, _fmt(row_data.get("Discipline","")),        bg="FFCCCC", align="center")
+            _c(ws, ri2, 4, _fmt(row_data.get("Responsible Engineer","")), bg="FFCCCC")
+            _c(ws, ri2, 5, issued_fmt,                                 bg="FFCCCC", align="center")
+            _c(ws, ri2, 6, due_fmt,                                    bg="FFCCCC", align="center")
+            ov_cell = _c(ws, ri2, 7, f"OVERDUE {days_over}d" if days_over != "" else "", bg="FFCCCC", align="center")
+            ov_cell.font = Font(name="Arial", bold=True, color="C00000", size=9)
             ws.row_dimensions[ri2].height = 14
 
 
@@ -390,7 +413,7 @@ def _build_tqsdr_data_tab(wb, tab_name, tab_color, src_df, src_map, out_cols,
     Row 4+: Data (alternating colours)
     """
     today = datetime.today()
-    report_date_str = today.strftime("%d %b %Y")
+    report_date_str = today.strftime("%d %B %Y")
 
     ws = wb.create_sheet(tab_name)
     ws.sheet_properties.tabColor = tab_color
@@ -406,7 +429,7 @@ def _build_tqsdr_data_tab(wb, tab_name, tab_color, src_df, src_map, out_cols,
     # Row 1 — title banner
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=n_cols)
     t = ws.cell(1, 1, f"{tab_name.upper()}   |   COMP5 PROJECT   |   {report_date_str}")
-    t.font      = Font(name="Calibri", bold=True, size=11, color=WHITE)
+    t.font      = Font(name="Arial", bold=True, size=11, color=WHITE)
     t.fill      = PatternFill("solid", fgColor=tab_color)
     t.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[1].height = 22
@@ -414,7 +437,7 @@ def _build_tqsdr_data_tab(wb, tab_name, tab_color, src_df, src_map, out_cols,
     # Row 2 — record count bar (no background fill — match web report)
     ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=n_cols)
     sb = ws.cell(2, 1, f"Total Records: {n_records}   |   {tab_name}   |   Date: {report_date_str}")
-    sb.font      = Font(name="Calibri", italic=True, size=9, color=GREY595)
+    sb.font      = Font(name="Arial", italic=True, size=9, color=GREY595)
     sb.alignment = Alignment(horizontal="center", vertical="center")
     sb.fill      = PatternFill(fill_type=None)  # no fill
     ws.row_dimensions[2].height = 16
@@ -471,11 +494,11 @@ def _build_tqsdr_data_tab(wb, tab_name, tab_color, src_df, src_map, out_cols,
                     if days < 0:
                         disp = f"OVERDUE {abs(days)}d"
                         cell = _c(ws, ri, ci, disp, bg="FFCCCC", align="center")
-                        cell.font = Font(name="Calibri", bold=True, color="C00000", size=9)
+                        cell.font = Font(name="Arial", bold=True, color="C00000", size=9)
                     elif days <= 7:
                         disp = f"{days} days"
                         cell = _c(ws, ri, ci, disp, bg=YELLOW, align="center")
-                        cell.font = Font(name="Calibri", bold=True, color="7F6000", size=9)
+                        cell.font = Font(name="Arial", bold=True, color="7F6000", size=9)
                     else:
                         disp = f"{days} days"
                         cell = _c(ws, ri, ci, disp, bg=bg, align="center")
@@ -519,7 +542,7 @@ def generate_tq_sdr(raw: bytes) -> dict:
         ("TQ REPLIED\nOPEN",              len(tqy_repopen), WHITE,  PURPLE),
     ]
     wb_tqy = Workbook(); wb_tqy.remove(wb_tqy.active)
-    _build_tqsdr_summary(wb_tqy, "TQ – TECHNICAL QUERY", TAB_BLUE, tqy_kpis,
+    _build_tqsdr_summary(wb_tqy, "TQ – TECHNICAL QUERY REGISTER | COMP5 PROJECT SUMMARY", TAB_BLUE, tqy_kpis,
                           disc_col_tqy,
                           tqy_issued, tqy_valid, tqy_expired, tqy_closed, tqy_repopen,
                           report_date)
@@ -551,7 +574,7 @@ def generate_tq_sdr(raw: bytes) -> dict:
         ("SDR REPLIED\nOPEN",              len(sdr_repopen), WHITE,  PURPLE),
     ]
     wb_sdr = Workbook(); wb_sdr.remove(wb_sdr.active)
-    _build_tqsdr_summary(wb_sdr, "SDR – SPECIFICATION DEVIATION REQUEST", TAB_BROWN, sdr_kpis,
+    _build_tqsdr_summary(wb_sdr, "SDR – SPECIFICATION DEVIATION REQUEST | COMP5 PROJECT SUMMARY", TAB_BROWN, sdr_kpis,
                           disc_col_sdr,
                           sdr_issued, sdr_valid, sdr_expired, sdr_closed, sdr_repopen,
                           report_date)
@@ -677,7 +700,7 @@ def _build_comp5_summary(wb, df, df_issued, df_not_issued, df_hold, report_date_
     ws.merge_cells("A1:G1")
     t = ws["A1"]
     t.value     = f"COMP5 — WEEKLY ISSUED DOCUMENTS STATUS REPORT  |  {report_date_str}"
-    t.font      = Font(name="Calibri", bold=True, size=13, color=WHITE)
+    t.font      = Font(name="Arial", bold=True, size=13, color=WHITE)
     t.fill      = PatternFill("solid", fgColor=DARK_BLUE)
     t.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[1].height = 34
@@ -686,7 +709,7 @@ def _build_comp5_summary(wb, df, df_issued, df_not_issued, df_hold, report_date_
     ws.merge_cells("A2:G2")
     s = ws["A2"]
     s.value     = f"Cut-Off Date: {report_date_str}  |  CONFIDENTIAL"
-    s.font      = Font(name="Calibri", italic=True, size=9, color=GREY595)
+    s.font      = Font(name="Arial", italic=True, size=9, color=GREY595)
     s.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[2].height = 16
 
@@ -747,25 +770,25 @@ def _build_comp5_summary(wb, df, df_issued, df_not_issued, df_hold, report_date_
         _c(ws, ri, 3, disc_name, bg=bg)
         # Issued to PDC = total docs for this disc
         tc = _c(ws, ri, 4, total, bg=bg, align="center", bold=True)
-        tc.font = Font(name="Calibri", bold=True, color=MID_BLUE, size=9)
+        tc.font = Font(name="Arial", bold=True, color=MID_BLUE, size=9)
         # Under Process
         uc = _c(ws, ri, 5, under, bg=bg, align="center", bold=True)
         if under > 0:
-            uc.font = Font(name="Calibri", bold=True, color="C00000", size=9)
+            uc.font = Font(name="Arial", bold=True, color="C00000", size=9)
         # Pending with Engineering
         hc = _c(ws, ri, 6, hold, bg=AMBER if hold > 0 else bg, align="center", bold=(hold > 0))
         if hold > 0:
-            hc.font = Font(name="Calibri", bold=True, color="7F6000", size=9)
+            hc.font = Font(name="Arial", bold=True, color="7F6000", size=9)
         # Status
         sc = _c(ws, ri, 7, status_txt, bg=status_bg, align="center", bold=True)
-        sc.font = Font(name="Calibri", bold=True, color=status_fg, size=9)
+        sc.font = Font(name="Arial", bold=True, color=status_fg, size=9)
         ws.row_dimensions[ri].height = 16
 
     # Legend
     leg_row = HDR_ROW + len(DISC_ORDER) + 3
     ws.merge_cells(f"A{leg_row}:G{leg_row}")
     lg = ws.cell(leg_row, 1, "LEGEND")
-    lg.font = Font(name="Calibri", bold=True, size=10, color=WHITE)
+    lg.font = Font(name="Arial", bold=True, size=10, color=WHITE)
     lg.fill = PatternFill("solid", fgColor=DARK_BLUE)
     lg.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[leg_row].height = 18
@@ -780,7 +803,7 @@ def _build_comp5_summary(wb, df, df_issued, df_not_issued, df_hold, report_date_
     for ri2, (bg, fg, txt) in enumerate(legend, leg_row+1):
         ws.merge_cells(f"A{ri2}:G{ri2}")
         lc = ws.cell(ri2, 1, txt)
-        lc.font      = Font(name="Calibri", size=9, color=fg)
+        lc.font      = Font(name="Arial", size=9, color=fg)
         lc.fill      = PatternFill("solid", fgColor=bg)
         lc.alignment = Alignment(horizontal="left", vertical="center", indent=2)
         lc.border    = _b()
@@ -800,7 +823,7 @@ def _build_datewise_tab(wb, df, report_date_str):
     ws.merge_cells("A1:P1")
     t = ws["A1"]
     t.value     = f"COMP5 — DATE-WISE ISSUED DOCUMENTS BREAKDOWN  |  {report_date_str}"
-    t.font      = Font(name="Calibri", bold=True, size=12, color=WHITE)
+    t.font      = Font(name="Arial", bold=True, size=12, color=WHITE)
     t.fill      = PatternFill("solid", fgColor=DK_ORANGE)
     t.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[1].height = 30
@@ -824,7 +847,7 @@ def _build_datewise_tab(wb, df, report_date_str):
     sec1_hdr_row = 3
     ws.merge_cells(f"A{sec1_hdr_row}:P{sec1_hdr_row}")
     s1 = ws.cell(sec1_hdr_row, 1, "SECTION 1 — DOCUMENTS ISSUED PER DAY BY DISCIPLINE")
-    s1.font      = Font(name="Calibri", bold=True, size=10, color=WHITE)
+    s1.font      = Font(name="Arial", bold=True, size=10, color=WHITE)
     s1.fill      = PatternFill("solid", fgColor=MID_ORG)
     s1.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[sec1_hdr_row].height = 18
@@ -854,7 +877,7 @@ def _build_datewise_tab(wb, df, report_date_str):
         _c(ws, row, len(hdr_cols), row_total, bg=DK_ORANGE if row_total>0 else bg,
            align="center", bold=True)
         if row_total > 0:
-            ws.cell(row, len(hdr_cols)).font = Font(name="Calibri", bold=True, color=WHITE, size=9)
+            ws.cell(row, len(hdr_cols)).font = Font(name="Arial", bold=True, color=WHITE, size=9)
         ws.row_dimensions[row].height = 14
         row += 1
 
@@ -869,7 +892,7 @@ def _build_datewise_tab(wb, df, report_date_str):
     # ── SECTION 2: daily stats with % ─────────────────────────────────────
     ws.merge_cells(f"A{row}:F{row}")
     s2 = ws.cell(row, 1, "SECTION 2 — DAILY STATUS SUMMARY")
-    s2.font      = Font(name="Calibri", bold=True, size=10, color=WHITE)
+    s2.font      = Font(name="Arial", bold=True, size=10, color=WHITE)
     s2.fill      = PatternFill("solid", fgColor=DK_ORANGE)
     s2.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[row].height = 18
@@ -916,13 +939,13 @@ def _build_comp5_detail_tab(wb, tab_name, tab_color, df, alt_bg):
     ws.sheet_properties.tabColor = tab_color
     ws.freeze_panes = "A3"
 
-    report_date_str = datetime.today().strftime("%d %b %Y")
+    report_date_str = datetime.today().strftime("%d %B %Y")
     n_cols = 13
 
     # Row 1 — title banner
     ws.merge_cells(f"A1:{get_column_letter(n_cols)}1")
     t = ws.cell(1, 1, f"{tab_name.upper()}   |   COMP5 PROJECT   |   {report_date_str}")
-    t.font      = Font(name="Calibri", bold=True, size=11, color=WHITE)
+    t.font      = Font(name="Arial", bold=True, size=11, color=WHITE)
     t.fill      = PatternFill("solid", fgColor=tab_color)
     t.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[1].height = 22
@@ -990,7 +1013,7 @@ def _build_comp5_detail_tab(wb, tab_name, tab_color, df, alt_bg):
         _c(ws, ri, 11, _g(row_data, "Issued by DC"), bg=bg)
         _c(ws, ri, 12, _g(row_data, "PCON TR"), bg=bg)
         sc = _c(ws, ri, 13, status, bg=sbg, align="center", bold=True)
-        sc.font = Font(name="Calibri", bold=True, color=sfg, size=9)
+        sc.font = Font(name="Arial", bold=True, color=sfg, size=9)
         ws.row_dimensions[ri].height = 14
 
 
@@ -1001,7 +1024,7 @@ def generate_comp5(raw: bytes) -> dict:
     6 tabs: Summary | Date-Wise Breakdown | Open-Issued to PCON |
             Under Process at PCON | Pending with Engineering | Issued to CPY
     """
-    report_date_str = datetime.today().strftime("%d %b %Y")
+    report_date_str = datetime.today().strftime("%d %B %Y")
     date_str        = datetime.today().strftime("%d%b%Y").upper()
 
     df_raw = _read_comp5(raw)        # LP → SH already done here
