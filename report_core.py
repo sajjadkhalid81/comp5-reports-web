@@ -1,8 +1,32 @@
 """
-report_core.py  —  COMP5 QatarEnergy LNG / Saipem JV
-Built strictly from:
-  - COMP5_Report_Instructions_v3.docx  (TQ & SDR report)
-  - COMP5_Report_Instructions.docx     (Issued Documents report)
+report_core.py
+==============
+COMP5 — QatarEnergy LNG / Saipem JV
+Weekly Document Control Report Generator
+
+Generates three report types from the COMP5 project register:
+  1. TQ  (Technical Query) Excel report        — via generate_tq_sdr()
+  2. SDR (Specification Deviation Request) Excel report — via generate_tq_sdr()
+  3. Weekly Issued Documents Excel report      — via generate_comp5()
+
+Sources:
+  - COMP5_Report_Instructions_v3.docx  (TQ & SDR specification)
+  - COMP5_Report_Instructions.docx     (Issued Documents specification)
+
+COMP5 Issued Documents — Key Rules:
+  - Sheet: "Issued Documents" (header row 0)
+  - LP discipline is merged into SH (LOSPE) before all processing
+  - Only the latest revision per document number is counted
+  - PCON- TR Issue Status categories:
+      "Issued"               → forwarded to Company (CPY)
+      "Not Issued"           → under process at PCON
+      "Under Correction/Hold"→ pending with Engineering (NOT at PCON)
+  - Status column shows: "Issued (0% Pending)" / "XX% Pending" /
+    "Not Issued (XX% Pending)" — never "Partially Issued"
+  - % Pending = (Not Issued + Under Correction/Hold) / Total × 100
+
+Author : Document Control — COMP5
+Version: 3.1.0
 """
 from __future__ import annotations
 from io import BytesIO
@@ -640,7 +664,7 @@ DISC_MAP = {
     "HV": "HVAC",           "PE": "Administrative / Eng. Mgmt",
     "LP": "HSE&Q/LOSPE",          # LP → SH/LOSPE
 }
-DISC_ORDER = ["PR","EL","SH","ME","PI","IN","ST","AB","TC","CE","HV","PE"]
+DISC_ORDER = ["PR","EL","SH","ME","PI","ST","TC","AB","CE","HV","IN","PE"]
 
 REV_ORDER = {"00":0,"0":0,"A":1,"B":2,"C":3,"D":4,"E":5,"F":6,"G":7,"H":8,"I":9,"J":10}
 
@@ -737,7 +761,7 @@ def _build_comp5_summary(wb, df, df_issued, df_not_issued, df_hold, report_date_
     # Sub-title
     ws.merge_cells("A2:G2")
     s = ws["A2"]
-    s.value     = f"Cut-Off Date: {report_date_str}  |  CONFIDENTIAL"
+    s.value     = f"Cut-Off Date: {report_date_str}  |  Total Documents: see table below  |  CONFIDENTIAL"
     s.font      = Font(name="Arial", italic=True, size=9, color=GREY595)
     s.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[2].height = 16
@@ -813,8 +837,47 @@ def _build_comp5_summary(wb, df, df_issued, df_not_issued, df_hold, report_date_
         sc.font = Font(name="Arial", bold=True, color=status_fg, size=9)
         ws.row_dimensions[ri].height = 16
 
+    # ── TOTAL row ────────────────────────────────────────────────────────────
+    total_row = HDR_ROW + len(DISC_ORDER) + 1
+    ws.merge_cells(f"A{total_row}:C{total_row}")
+    tc = ws.cell(total_row, 1, "TOTAL")
+    tc.font      = Font(name="Arial", bold=True, size=10, color=WHITE)
+    tc.fill      = PatternFill("solid", fgColor=DARK_BLUE)
+    tc.alignment = Alignment(horizontal="center", vertical="center")
+    tc.border    = _b()
+    total_d2p    = sum(count_by_disc(df, code) for code in DISC_ORDER)
+    total_under  = sum(count_by_disc(df_not_issued, code) for code in DISC_ORDER)
+    total_hold   = sum(count_by_disc(df_hold, code) for code in DISC_ORDER)
+    total_pend   = total_under + total_hold
+    tot_pct      = int(round(total_pend / total_d2p * 100)) if total_d2p > 0 else 0
+    for ci2, val in [(4, total_d2p), (5, total_under), (6, total_hold)]:
+        tc2 = ws.cell(total_row, ci2, val)
+        tc2.font      = Font(name="Arial", bold=True, size=10, color=WHITE)
+        tc2.fill      = PatternFill("solid", fgColor=DARK_BLUE)
+        tc2.alignment = Alignment(horizontal="center", vertical="center")
+        tc2.border    = _b()
+    # Status cell in total row
+    tc7 = ws.cell(total_row, 7, f"{tot_pct}% Pending")
+    tc7.font      = Font(name="Arial", bold=True, size=10, color=WHITE)
+    tc7.fill      = PatternFill("solid", fgColor=DARK_BLUE)
+    tc7.alignment = Alignment(horizontal="center", vertical="center")
+    tc7.border    = _b()
+    ws.row_dimensions[total_row].height = 20
+
+    # ── Footnote ─────────────────────────────────────────────────────────────
+    note_row = total_row + 1
+    ws.merge_cells(f"A{note_row}:G{note_row}")
+    nc = ws.cell(note_row, 1,
+                 "* LP (Layout & Plot Plan) documents combined under SH – LOSPE.  "
+                 "** Under Correction/Hold = pending with Engineering, NOT at PCON.")
+    nc.font      = Font(name="Arial", italic=True, size=8, color="444444")
+    nc.fill      = PatternFill("solid", fgColor=LT_GREY)
+    nc.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+    nc.border    = _b()
+    ws.row_dimensions[note_row].height = 14
+
     # Legend
-    leg_row = HDR_ROW + len(DISC_ORDER) + 3
+    leg_row = HDR_ROW + len(DISC_ORDER) + 4
     ws.merge_cells(f"A{leg_row}:G{leg_row}")
     lg = ws.cell(leg_row, 1, "LEGEND")
     lg.font = Font(name="Arial", bold=True, size=10, color=WHITE)
@@ -848,8 +911,10 @@ def _build_datewise_tab(wb, df, report_date_str):
     ws = wb.create_sheet("Date-Wise Breakdown")
     ws.sheet_properties.tabColor = DK_ORANGE
 
-    # Title banner
-    ws.merge_cells("A1:P1")
+    # Title banner — dynamic width based on disciplines + 2 (Date + TOTAL)
+    # We don't know discs yet so use a safe wide range; will tighten after disc calc
+    _TITLE_END_COL = get_column_letter(len(DISC_ORDER) + 2)
+    ws.merge_cells(f"A1:{_TITLE_END_COL}1")
     t = ws["A1"]
     t.value     = f"COMP5 — DATE-WISE ISSUED DOCUMENTS BREAKDOWN  |  {report_date_str}"
     t.font      = Font(name="Arial", bold=True, size=12, color=WHITE)
@@ -874,7 +939,8 @@ def _build_datewise_tab(wb, df, report_date_str):
 
     # ── SECTION 1: per-day by discipline ─────────────────────────────────
     sec1_hdr_row = 3
-    ws.merge_cells(f"A{sec1_hdr_row}:P{sec1_hdr_row}")
+    _S1_END_COL = get_column_letter(len(discs_sorted) + 2)
+    ws.merge_cells(f"A{sec1_hdr_row}:{_S1_END_COL}{sec1_hdr_row}")
     s1 = ws.cell(sec1_hdr_row, 1, "SECTION 1 — DOCUMENTS ISSUED PER DAY BY DISCIPLINE")
     s1.font      = Font(name="Arial", bold=True, size=10, color=WHITE)
     s1.fill      = PatternFill("solid", fgColor=MID_ORG)
@@ -945,21 +1011,56 @@ def _build_datewise_tab(wb, df, report_date_str):
         else:
             issued_cpy = not_iss = hold = 0
 
-        pct_under  = f"{int(round(not_iss/total*100))}%" if total > 0 else "0%"
-        pct_issued = f"{int(round(issued_cpy/total*100))}%" if total > 0 else "0%"
+        pct_under  = f"{not_iss / total * 100:.1f}%" if total > 0 else "0.0%"
+        pct_issued = f"{issued_cpy / total * 100:.1f}%" if total > 0 else "0.0%"
+
+        pct_u_val  = not_iss / total * 100 if total > 0 else 0
+        pct_c_val  = issued_cpy / total * 100 if total > 0 else 0
+
+        # % Under Process colour
+        if pct_u_val == 0:    pu_bg, pu_fg = LT_GREEN, DK_GREEN
+        elif pct_u_val <= 50: pu_bg, pu_fg = YELLOW,   "7F6000"
+        else:                 pu_bg, pu_fg = LT_RED,    "C00000"
+
+        # % Issued to CPY colour
+        if pct_c_val == 100:  pc_bg, pc_fg = LT_GREEN, DK_GREEN
+        elif pct_c_val > 0:   pc_bg, pc_fg = YELLOW,   "7F6000"
+        else:                 pc_bg, pc_fg = LT_RED,    "C00000"
 
         bg = LT_ORANGE if row % 2 == 0 else WHITE
         _c(ws, row, 1, dt.strftime("%d-%b-%Y") if dt else "", bg=bg, align="center")
         _c(ws, row, 2, total,     bg=bg, align="center")
-        _c(ws, row, 3, not_iss,   bg=LT_RED   if not_iss > 0 else bg, align="center")
-        _c(ws, row, 4, hold,      bg=AMBER     if hold > 0 else bg, align="center")
-        _c(ws, row, 5, pct_under, bg=bg, align="center")
-        _c(ws, row, 6, pct_issued,bg=LT_GREEN  if issued_cpy > 0 else bg, align="center")
+        _c(ws, row, 3, not_iss if not_iss > 0 else "",   bg=LT_RED if not_iss > 0 else bg, align="center", bold=not_iss > 0, fg="C00000" if not_iss > 0 else BLACK)
+        _c(ws, row, 4, hold if hold > 0 else "",          bg=AMBER  if hold > 0 else bg,   align="center", bold=hold > 0,   fg="7F4000" if hold > 0 else BLACK)
+
+        pu_cell = _c(ws, row, 5, pct_under, bg=pu_bg, align="center", bold=True, fg=pu_fg)
+        pu_cell.font = Font(name="Arial", bold=True, color=pu_fg, size=9)
+
+        pc_cell = _c(ws, row, 6, pct_issued, bg=pc_bg, align="center", bold=True, fg=pc_fg)
+        pc_cell.font = Font(name="Arial", bold=True, color=pc_fg, size=9)
+
         ws.row_dimensions[row].height = 14
         row += 1
 
+    # ── Section 2 TOTAL row ───────────────────────────────────────────────
+    all_s = df2[status_col].astype(str).str.strip().str.upper() if status_col in df2.columns else pd.Series(dtype=str)
+    grand_total    = len(df2)
+    grand_not_iss  = (all_s == "NOT ISSUED").sum()
+    grand_hold     = all_s.str.contains("CORRECTION|HOLD", na=False).sum()
+    grand_cpy      = (all_s == "ISSUED").sum()
+    grand_pct_u    = f"{grand_not_iss / grand_total * 100:.1f}%" if grand_total > 0 else "0.0%"
+    grand_pct_c    = f"{grand_cpy / grand_total * 100:.1f}%" if grand_total > 0 else "0.0%"
 
-def _build_comp5_detail_tab(wb, tab_name, tab_color, df, alt_bg):
+    _c(ws, row, 1, "TOTAL",        bg=DK_ORANGE, bold=True, fg=WHITE, align="center")
+    _c(ws, row, 2, grand_total,    bg=DK_ORANGE, bold=True, fg=WHITE, align="center")
+    _c(ws, row, 3, grand_not_iss,  bg=DK_ORANGE, bold=True, fg=WHITE, align="center")
+    _c(ws, row, 4, grand_hold,     bg=DK_ORANGE, bold=True, fg=WHITE, align="center")
+    _c(ws, row, 5, grand_pct_u,    bg=DK_ORANGE, bold=True, fg=WHITE, align="center")
+    _c(ws, row, 6, grand_pct_c,    bg=DK_ORANGE, bold=True, fg=WHITE, align="center")
+    ws.row_dimensions[row].height = 18
+
+
+def _build_comp5_detail_tab(wb, tab_name, tab_color, df, alt_bg, report_date_str):
     """
     Detail tab with 13 columns as per spec.
     Column M (PCON TR Issue Status) colour-coded.
@@ -968,7 +1069,6 @@ def _build_comp5_detail_tab(wb, tab_name, tab_color, df, alt_bg):
     ws.sheet_properties.tabColor = tab_color
     ws.freeze_panes = "A3"
 
-    report_date_str = datetime.today().strftime("%d %B %Y")
     n_cols = 13
 
     # Row 1 — title banner
@@ -1016,8 +1116,9 @@ def _build_comp5_detail_tab(wb, tab_name, tab_color, df, alt_bg):
 
     status_col = "PCON- TR Issue Status"
     STATUS_COLORS = {
-        "ISSUED":         (LT_GREEN, DK_GREEN),
-        "NOT ISSUED":     (LT_RED,   "C00000"),
+        "ISSUED":                   (LT_GREEN, DK_GREEN),
+        "NOT ISSUED":               (LT_RED,   "C00000"),
+        "UNDER CORRECTION/HOLD":    (AMBER,    "7F4000"),
     }
 
     for ri, (_, row_data) in enumerate(df.iterrows(), 3):
@@ -1025,7 +1126,13 @@ def _build_comp5_detail_tab(wb, tab_name, tab_color, df, alt_bg):
         disc_code = str(row_data.get("Discipline","")).strip().upper()
         disc_name = DISC_MAP.get(disc_code, disc_code)
         status    = str(row_data.get(status_col,"")).strip()
-        sbg, sfg  = STATUS_COLORS.get(status.upper(), (AMBER, "7F6000"))
+        status_up = status.upper()
+        if status_up in STATUS_COLORS:
+            sbg, sfg = STATUS_COLORS[status_up]
+        elif "CORRECTION" in status_up or "HOLD" in status_up:
+            sbg, sfg = STATUS_COLORS["UNDER CORRECTION/HOLD"]
+        else:
+            sbg, sfg = (AMBER, "7F6000")
 
         _c(ws, ri,  1, ri-2, bg=bg, align="center")
         # Client doc no with rev
@@ -1064,10 +1171,10 @@ def generate_comp5(raw: bytes) -> dict:
 
     _build_comp5_summary(wb, df_all, df_issued, df_not_issued, df_hold, report_date_str)
     _build_datewise_tab(wb, df_all, report_date_str)
-    _build_comp5_detail_tab(wb, "Open - Issued to PCON",      MID_BLUE, df_all,       LT_BLUE)
-    _build_comp5_detail_tab(wb, "Under Process at PCON",      DK_ORANGE, df_not_issued, LT_ORANGE)
-    _build_comp5_detail_tab(wb, "Pending with Engineering",   PURPLE,   df_hold,       LT_PURPLE)
-    _build_comp5_detail_tab(wb, "Issued to CPY",              DK_GREEN, df_issued,     LT_GREEN)
+    _build_comp5_detail_tab(wb, "Open - Issued to PCON",      "2E75B6",  df_all,        LT_BLUE,   report_date_str)
+    _build_comp5_detail_tab(wb, "Under Process at PCON",      DK_ORANGE, df_not_issued, LT_ORANGE, report_date_str)
+    _build_comp5_detail_tab(wb, "Pending with Engineering",   PURPLE,    df_hold,       LT_PURPLE, report_date_str)
+    _build_comp5_detail_tab(wb, "Issued to CPY",              DK_GREEN,  df_issued,     LT_GREEN,  report_date_str)
 
     summary = {
         "week":       report_date_str,
