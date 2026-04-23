@@ -53,6 +53,7 @@ def _h(ws, r, c, lbl, bg=DARK_BLUE, fg=WHITE, sz=9):
     return _c(ws, r, c, lbl, bold=True, fg=fg, bg=bg, align="center", wrap=True, sz=sz)
 
 def _fmt(v):
+    """Format a cell value. Returns empty string for None/NaT/NaN. Never returns dash."""
     if v is None:
         return ""
     # Must check pd.NaT BEFORE isinstance(datetime) — NaT passes that check
@@ -68,7 +69,11 @@ def _fmt(v):
             return v.strftime("%d-%b-%Y")
         except (ValueError, AttributeError):
             return ""
-    return str(v).strip()
+    s = str(v).strip()
+    # Never output bare dashes as placeholders
+    if s in ("–", "-", "—", "nan", "NaT", "None"):
+        return ""
+    return s
 
 def _wb_bytes(wb):
     buf = BytesIO(); wb.save(buf); buf.seek(0); return buf.read()
@@ -167,18 +172,21 @@ def categorise(df, transmittal_col, date_replied_col, response_col,
     df_sorted = df.sort_values([doc_col, rev_col])
     df_latest = df_sorted.drop_duplicates(subset=[doc_col], keep="last").reset_index(drop=True)
 
-    issued = df_latest[df_latest[transmittal_col].notna() &
-                       (df_latest[transmittal_col].astype(str).str.strip() != "")]
+    # Only include docs that have a real transmittal number (not blank/whitespace/nan/-)
+    def _has_transmittal(series):
+        s = series.fillna("").astype(str).str.strip()
+        return s.notna() & (s != "") & (s != "nan") & (s != "NaN") & (s != "-") & (s != "–")
 
+    issued = df_latest[_has_transmittal(df_latest[transmittal_col])]
+
+    has_tr = _has_transmittal(df_latest[transmittal_col])
     not_rep_v = df_latest[
-        df_latest[transmittal_col].notna() &
-        (df_latest[transmittal_col].astype(str).str.strip() != "") &
+        has_tr &
         ~df_latest["_replied"] &
         (df_latest["RESPOND DUE DATE"] >= today)
     ]
     not_rep_e = df_latest[
-        df_latest[transmittal_col].notna() &
-        (df_latest[transmittal_col].astype(str).str.strip() != "") &
+        has_tr &
         ~df_latest["_replied"] &
         (df_latest["RESPOND DUE DATE"] < today)
     ]
@@ -229,7 +237,15 @@ def _add_days_remaining(df: pd.DataFrame, src_df: pd.DataFrame, today) -> pd.Dat
 def _build_tqsdr_summary(wb, title, header_color, kpis, disc_col,
                           issued, not_rep_v, not_rep_e, rep_closed, rep_open,
                           report_date_str):
-    """Build Summary tab: title + date + 5 KPI boxes + discipline breakdown."""
+    """Build Summary tab matching web report exactly:
+    Row 1: Title banner (merged A:F)
+    Row 2: Report date (merged A:F)
+    Rows 4-9: 3 KPI boxes (label R4-6, count R7-9), each spanning 2 cols
+    Rows 11-16: 2 KPI boxes (label R11-13, count R14-16)
+    Row 18: DISCIPLINE BREAKDOWN banner
+    Row 19: Disc table headers
+    Row 20+: Disc data (NO total row)
+    """
     ws = wb.create_sheet("SUMMARY")
     ws.sheet_properties.tabColor = header_color
 
@@ -250,48 +266,55 @@ def _build_tqsdr_summary(wb, title, header_color, kpis, disc_col,
     d.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[2].height = 18
 
-    # Rows 4–10: 5 KPI boxes (3 on first row, 2 on second)
+    # KPI boxes: 3 on top row (R4-9), 2 on bottom row (R11-16)
+    # Each box: label rows span 3 rows, count rows span 3 rows
+    # Columns: A:B, C:D, E:F
     BOX_POS = [(4,1,2),(4,3,4),(4,5,6),(11,1,2),(11,3,4)]
     for i, (label, count, fg, bg) in enumerate(kpis):
         row, cs, ce = BOX_POS[i]
-        ws.merge_cells(start_row=row,   start_column=cs, end_row=row+2,   end_column=ce)
-        ws.merge_cells(start_row=row+3, start_column=cs, end_row=row+5,   end_column=ce)
+        # Label cell (rows row to row+2)
+        ws.merge_cells(start_row=row,   start_column=cs, end_row=row+2, end_column=ce)
         lc = ws.cell(row, cs, label)
         lc.font      = Font(name="Calibri", bold=True, size=10, color=fg)
         lc.fill      = PatternFill("solid", fgColor=bg)
         lc.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        for r2 in range(row, row+3):
+            for c2 in range(cs, ce+1):
+                ws.cell(r2, c2).border = _b()
+        # Count cell (rows row+3 to row+5)
+        ws.merge_cells(start_row=row+3, start_column=cs, end_row=row+5, end_column=ce)
         nc = ws.cell(row+3, cs, count)
         nc.font      = Font(name="Calibri", bold=True, size=28, color=fg)
         nc.fill      = PatternFill("solid", fgColor=bg)
         nc.alignment = Alignment(horizontal="center", vertical="center")
-        for r in range(row, row+6):
-            for col in range(cs, ce+1):
-                ws.cell(r, col).border = _b()
+        for r2 in range(row+3, row+6):
+            for c2 in range(cs, ce+1):
+                ws.cell(r2, c2).border = _b()
 
-    # Col 6 is intentionally blank (only 5 KPI boxes, not 6)
     for col in range(1, 7):
         ws.column_dimensions[get_column_letter(col)].width = 18
     for r in range(3, 18):
         ws.row_dimensions[r].height = 16
 
-    # Row 18: Discipline breakdown header
+    # Row 18: Discipline breakdown banner
     DISC_HDR_ROW = 19
+    ws.merge_cells(f"A18:F18")
+    banner = ws.cell(18, 1, "DISCIPLINE BREAKDOWN")
+    banner.font      = Font(name="Calibri", bold=True, size=11, color=WHITE)
+    banner.fill      = PatternFill("solid", fgColor=header_color)
+    banner.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[18].height = 20
+
+    # Row 19: Disc table column headers — "ISSUED" not "ISSUED (by Sai)"
     disc_headers = [
         "Discipline", "ISSUED", "NOT REPLIED\n(Not Exp.)",
         "NOT REPLIED\n(Expired)", "REPLIED\nCLOSED", "REPLIED\nOPEN"
     ]
-    ws.merge_cells(f"A{DISC_HDR_ROW-1}:F{DISC_HDR_ROW-1}")
-    banner = ws.cell(DISC_HDR_ROW-1, 1, "DISCIPLINE BREAKDOWN")
-    banner.font      = Font(name="Calibri", bold=True, size=11, color=WHITE)
-    banner.fill      = PatternFill("solid", fgColor=header_color)
-    banner.alignment = Alignment(horizontal="center", vertical="center")
-    ws.row_dimensions[DISC_HDR_ROW-1].height = 20
-
     for ci, h in enumerate(disc_headers, 1):
         _h(ws, DISC_HDR_ROW, ci, h, bg=header_color)
     ws.row_dimensions[DISC_HDR_ROW].height = 30
 
-    # Collect all disciplines
+    # Collect disciplines from ALL categories
     def get_disc(df_):
         if disc_col and disc_col in df_.columns:
             return df_[disc_col].astype(str).str.strip()
@@ -308,12 +331,12 @@ def _build_tqsdr_summary(wb, title, header_color, kpis, disc_col,
     ALT = "EBF3FB"
     for ri, disc in enumerate(all_discs, DISC_HDR_ROW+1):
         bg = ALT if ri % 2 == 0 else WHITE
-        def cnt(df_):
+        def cnt(df_, d=disc):
             s = get_disc(df_)
-            return (s == disc).sum() if len(s) else 0
+            return int((s == d).sum()) if len(s) else 0
         _c(ws, ri, 1, disc, bg=bg)
-        _c(ws, ri, 2, cnt(issued),    bg=bg, align="center")
-        _c(ws, ri, 3, cnt(not_rep_v), bg=bg, align="center")
+        _c(ws, ri, 2, cnt(issued),     bg=bg, align="center")
+        _c(ws, ri, 3, cnt(not_rep_v),  bg=bg, align="center")
         exp_cnt = cnt(not_rep_e)
         cell_exp = _c(ws, ri, 4, exp_cnt, bg="FFCCCC" if exp_cnt > 0 else bg, align="center")
         if exp_cnt > 0:
@@ -321,6 +344,7 @@ def _build_tqsdr_summary(wb, title, header_color, kpis, disc_col,
         _c(ws, ri, 5, cnt(rep_closed), bg=bg, align="center")
         _c(ws, ri, 6, cnt(rep_open),   bg=bg, align="center")
         ws.row_dimensions[ri].height = 14
+    # NO total row — removed by manager
 
     # Expired urgent table (only if expired records exist)
     if len(not_rep_e) > 0 and disc_col and disc_col in not_rep_e.columns:
@@ -387,11 +411,12 @@ def _build_tqsdr_data_tab(wb, tab_name, tab_color, src_df, src_map, out_cols,
     t.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[1].height = 22
 
-    # Row 2 — record count bar
+    # Row 2 — record count bar (no background fill — match web report)
     ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=n_cols)
     sb = ws.cell(2, 1, f"Total Records: {n_records}   |   {tab_name}   |   Date: {report_date_str}")
     sb.font      = Font(name="Calibri", italic=True, size=9, color=GREY595)
     sb.alignment = Alignment(horizontal="center", vertical="center")
+    sb.fill      = PatternFill(fill_type=None)  # no fill
     ws.row_dimensions[2].height = 16
 
     # Row 3 — column headers
@@ -487,7 +512,7 @@ def generate_tq_sdr(raw: bytes) -> dict:
     )
 
     tqy_kpis = [
-        ("TQ ISSUED\n(by Sai)",           len(tqy_issued),  WHITE,  TAB_BLUE),
+        ("TQ ISSUED\n(by Sai)",           len(tqy_issued),  WHITE,  DARK_BLUE),
         ("TQ NOT REPLIED\n(Not Expired)", len(tqy_valid),   WHITE,  "1F7A3C"),
         ("TQ NOT REPLIED\n(Expired)",     len(tqy_expired), WHITE,  "C00000"),
         ("TQ REPLIED\nCLOSED",            len(tqy_closed),  WHITE,  GREY595),
