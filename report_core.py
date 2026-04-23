@@ -127,6 +127,34 @@ SDR_SRC_MAP = {
     "CPY Response":        "STATUS / COMPANY RESPONSE",
 }
 
+# Discipline code → full name (for Summary sheet display)
+TQY_DISC_MAP = {
+    "AB": "Architectural",
+    "CC": "Construction",
+    "CE": "Corrosion Engineering",
+    "CL": "Civil",
+    "DR": "Drilling",
+    "EL": "Electrical",
+    "GS": "Geosciences",
+    "HV": "HVAC",
+    "IC": "ICS Security",
+    "IN": "Instrumentation",
+    "LP": "HSE&Q/LOSPE",
+    "ME": "Mechanical",
+    "MO": "Marine Operations",
+    "MT": "Material Technology",
+    "OP": "Operations",
+    "PE": "Administrative / Eng. Mgmt",
+    "PI": "Piping",
+    "PL": "Pipelines",
+    "PR": "Process",
+    "QM": "Quality Management",
+    "SH": "HSE&Q/LOSPE",
+    "SS": "Subsurface",
+    "ST": "Structural",
+    "TC": "Telecommunications",
+}
+
 # Tab colours per section 4
 TAB_BLUE   = DARK_BLUE  # ISSUED
 TAB_GREEN  = "1F7A3C"   # NOT REPLIED (Not Expired)
@@ -345,7 +373,8 @@ def _build_tqsdr_summary(wb, title, header_color, kpis, disc_col,
         def cnt(df_, d=disc):
             s = get_disc(df_)
             return int((s == d).sum()) if len(s) else 0
-        _c(ws, ri, 1, disc, bg=bg)
+        disc_name = TQY_DISC_MAP.get(str(disc).strip().upper(), disc)
+        _c(ws, ri, 1, disc_name, bg=bg)
         _c(ws, ri, 2, cnt(issued),     bg=bg, align="center")
         _c(ws, ri, 3, cnt(not_rep_v),  bg=bg, align="center")
         exp_cnt = cnt(not_rep_e)
@@ -609,7 +638,7 @@ DISC_MAP = {
     "ST": "Structural",     "AB": "Architectural",
     "TC": "Telecommunication","CE": "Corrosion Engineering",
     "HV": "HVAC",           "PE": "Administrative / Eng. Mgmt",
-    "LP": "LOSPE",          # LP → SH/LOSPE
+    "LP": "HSE&Q/LOSPE",          # LP → SH/LOSPE
 }
 DISC_ORDER = ["PR","EL","SH","ME","PI","IN","ST","AB","TC","CE","HV","PE"]
 
