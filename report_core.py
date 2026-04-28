@@ -16,7 +16,8 @@ Sources:
 COMP5 Issued Documents — Key Rules:
   - Sheet: "Issued Documents" (header row 0)
   - LP discipline is merged into SH (LOSPE) before all processing
-  - Only the latest revision per document number is counted
+  - All revisions of a document are counted separately
+  - Only exact duplicate rows (same doc + same rev) are removed
   - PCON- TR Issue Status categories:
       "Issued"               → forwarded to Company (CPY)
       "Not Issued"           → under process at PCON
@@ -691,25 +692,25 @@ def _read_comp5(raw: bytes) -> pd.DataFrame:
 
 
 def _dedup_comp5(df: pd.DataFrame) -> pd.DataFrame:
-    """Keep only latest revision per CLIENTDOCUMENTNO."""
+    """
+    Remove only genuine data-entry duplicates: rows where both
+    CLIENTDOCUMENTNO. and Rev are identical (same document entered twice).
+
+    Different revisions of the same document (e.g. Rev B and Rev C) are
+    intentionally kept as separate rows — each revision counts independently.
+    """
     doc_col = "CLIENTDOCUMENTNO."
     rev_col = "Rev"
     if doc_col not in df.columns:
-        # try to find it
-        matches = [c for c in df.columns if "CLIENTDOC" in c.upper().replace(" ","") or "CLIENT DOC" in c.upper()]
+        matches = [c for c in df.columns if "CLIENTDOC" in c.upper().replace(" ", "") or "CLIENT DOC" in c.upper()]
         if matches:
             doc_col = matches[0]
         else:
             return df  # cannot dedup
 
     df = df.copy()
-    df["Rev_num"] = df[rev_col].astype(str).str.strip().map(REV_ORDER).fillna(99) if rev_col in df.columns else 0
-    sort_cols = [doc_col, "Rev_num"]
-    if "Date Issued" in df.columns:
-        sort_cols.append("Date Issued")
-    df = df.sort_values(sort_cols)
-    df = df.drop_duplicates(subset=doc_col, keep="last")
-    df = df.drop(columns=["Rev_num"], errors="ignore")
+    # Deduplicate only on (doc_number + revision) — keep first occurrence
+    df = df.drop_duplicates(subset=[doc_col, rev_col], keep="first")
     return df.reset_index(drop=True)
 
 
@@ -1164,7 +1165,7 @@ def generate_comp5(raw: bytes) -> dict:
     date_str        = datetime.today().strftime("%d%b%Y").upper()
 
     df_raw = _read_comp5(raw)        # LP → SH already done here
-    df     = _dedup_comp5(df_raw)    # latest rev per doc
+    df     = _dedup_comp5(df_raw)    # remove exact same-doc+rev duplicates only
     df_all, df_issued, df_not_issued, df_hold = _split_comp5(df)
 
     wb = Workbook(); wb.remove(wb.active)
