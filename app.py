@@ -1,16 +1,18 @@
 """
-COMP5 Reports Web App — Standalone Flask application
-Fix: Files are streamed directly in the API response (no in-memory store).
-     This works correctly on Render free tier where the server can spin down
-     between requests, wiping any in-memory data.
+COMP5 Reports Web App — app.py
+Existing routes (DO NOT TOUCH):
+  GET  /                        → reports page
+  POST /api/tq-sdr/summary      → TQ & SDR summary JSON
+  POST /api/tq-sdr/tqy          → download TQY Excel
+  POST /api/tq-sdr/sdr          → download SDR Excel
+  POST /api/comp5/summary       → COMP5 Issued Docs summary JSON
+  POST /api/comp5/download      → download COMP5 Issued Docs Excel
 
-Routes:
-  GET  /                       -> reports page
-  POST /api/tq-sdr/summary     -> return JSON summary only (KPI display)
-  POST /api/tq-sdr/tqy         -> generate & download TQY Excel immediately
-  POST /api/tq-sdr/sdr         -> generate & download SDR Excel immediately
-  POST /api/comp5/summary      -> return JSON summary only
-  POST /api/comp5/download     -> generate & download COMP5 Excel immediately
+New routes added at bottom (Report 3 — MR & TBE):
+  POST /api/mr/summary          → MR summary JSON
+  POST /api/mr/download         → download MR Excel
+  POST /api/tbe/summary         → TBE summary JSON
+  POST /api/tbe/download        → download TBE Excel
 """
 
 import os
@@ -23,12 +25,16 @@ app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50 MB
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
+# ── Page ───────────────────────────────────────────────────────────────────
+
 @app.route("/")
 def index():
     return render_template("reports.html")
 
 
-# ── TQ & SDR ───────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════
+# EXISTING — Report 1: TQ & SDR  (DO NOT TOUCH)
+# ══════════════════════════════════════════════════════════════════════════
 
 @app.route("/api/tq-sdr/summary", methods=["POST"])
 def api_tq_sdr_summary():
@@ -70,7 +76,9 @@ def api_download_sdr():
         return str(e), 500
 
 
-# ── COMP5 ──────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════
+# EXISTING — Report 2: COMP5 Issued Documents  (DO NOT TOUCH)
+# ══════════════════════════════════════════════════════════════════════════
 
 @app.route("/api/comp5/summary", methods=["POST"])
 def api_comp5_summary():
@@ -91,6 +99,62 @@ def api_download_comp5():
     try:
         from report_core import generate_comp5
         result = generate_comp5(request.files["file"].read())
+        return send_file(BytesIO(result["bytes"]),
+                         download_name=result["filename"],
+                         as_attachment=True, mimetype=XLSX_MIME)
+    except Exception as e:
+        return str(e), 500
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# NEW — Report 3: MR & TBE  (added below, nothing above touched)
+# ══════════════════════════════════════════════════════════════════════════
+
+@app.route("/api/mr/summary", methods=["POST"])
+def api_mr_summary():
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+    try:
+        from mr_tbe_report import generate_mr
+        result = generate_mr(request.files["file"].read())
+        return jsonify({"summary": result["summary"], "filename": result["filename"]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/mr/download", methods=["POST"])
+def api_download_mr():
+    if "file" not in request.files:
+        return "No file uploaded", 400
+    try:
+        from mr_tbe_report import generate_mr
+        result = generate_mr(request.files["file"].read())
+        return send_file(BytesIO(result["bytes"]),
+                         download_name=result["filename"],
+                         as_attachment=True, mimetype=XLSX_MIME)
+    except Exception as e:
+        return str(e), 500
+
+
+@app.route("/api/tbe/summary", methods=["POST"])
+def api_tbe_summary():
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+    try:
+        from mr_tbe_report import generate_tbe
+        result = generate_tbe(request.files["file"].read())
+        return jsonify({"summary": result["summary"], "filename": result["filename"]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/tbe/download", methods=["POST"])
+def api_download_tbe():
+    if "file" not in request.files:
+        return "No file uploaded", 400
+    try:
+        from mr_tbe_report import generate_tbe
+        result = generate_tbe(request.files["file"].read())
         return send_file(BytesIO(result["bytes"]),
                          download_name=result["filename"],
                          as_attachment=True, mimetype=XLSX_MIME)
