@@ -73,7 +73,7 @@
     text-align: center; cursor: pointer; transition: border-color .2s,background .2s; position: relative;
   }
   .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent); background: rgba(232,160,32,.04); }
-  .drop-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .drop-zone input[type=file] { display: none; }
   .drop-icon { font-size: 32px; margin-bottom: 10px; }
   .drop-label { font-size: 13px; color: var(--dim); }
   .drop-label strong { color: var(--accent); }
@@ -153,6 +153,7 @@
       <span class="badge accent">Document Control</span>
       <span class="badge">TQ · SDR</span>
       <span class="badge">Issued Documents</span>
+      <span class="badge">MR · TBE</span>
       <span class="badge" id="today-badge">—</span>
     </div>
   </header>
@@ -168,7 +169,7 @@
     </div>
     <div class="card-body">
       <div class="drop-zone" id="dz1">
-        <input type="file" accept=".xlsx,.xls" id="file1" onchange="onFileChange(1)">
+        <input type="file" accept=".xlsx,.xls" id="file1" >
         <div class="drop-icon">📊</div>
         <div class="drop-label">Drop <strong>TQ-SDR Log</strong> here or click to browse</div>
         <div class="drop-note">COMP5_-_TQ-SDR-CR-ARN-DCR_LOG.xlsx</div>
@@ -225,7 +226,7 @@
     </div>
     <div class="card-body">
       <div class="drop-zone" id="dz2">
-        <input type="file" accept=".xlsx,.xls" id="file2" onchange="onFileChange(2)">
+        <input type="file" accept=".xlsx,.xls" id="file2" >
         <div class="drop-icon">📋</div>
         <div class="drop-label">Drop <strong>COMP5 Register</strong> here or click to browse</div>
         <div class="drop-note">COMP5_REGISTER.xlsx</div>
@@ -256,6 +257,63 @@
     </div>
   </div>
 
+
+  <!-- ── Report 3: MR & TBE ── -->
+  <div class="report-card">
+    <div class="card-header">
+      <div class="card-num">3</div>
+      <div>
+        <div class="card-title">MR &amp; TBE Weekly Report</div>
+        <div class="card-sub">COMP5_REGISTER.xlsx &nbsp;·&nbsp; Sheet: Reference &nbsp;·&nbsp; Types: H &amp; J</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="drop-zone" id="dz3">
+        <input type="file" accept=".xlsx,.xls" id="file3" >
+        <div class="drop-icon">📦</div>
+        <div class="drop-label">Drop <strong>COMP5 Register</strong> here or click to browse</div>
+        <div class="drop-note">COMP5_REGISTER.xlsx</div>
+        <div class="file-chosen" id="fname3"></div>
+      </div>
+      <button class="btn-generate" id="btn3" onclick="loadSummary3()" disabled>
+        Analyse &amp; Show Summary
+      </button>
+      <div class="spinner" id="spin3">
+        <div class="spinner-ring"></div>
+        <div class="spinner-label" id="spin-label3">Processing…</div>
+      </div>
+      <div class="error-box" id="err3"></div>
+      <div class="results" id="res3">
+        <div class="two-col">
+          <div>
+            <div class="results-title">📦 MR — Material Requisitions</div>
+            <div class="kpi-grid" id="kpi-mr"></div>
+          </div>
+          <div>
+            <div class="results-title">📋 TBE — Technical Bid Evaluation</div>
+            <div class="kpi-grid" id="kpi-tbe"></div>
+          </div>
+        </div>
+        <div class="dl-row">
+          <button class="btn-dl" id="dl-mr" onclick="downloadFile3('mr')">
+            <span class="dl-icon">⬇</span>
+            <span class="dl-info">
+              <span>Download MR Report</span>
+              <span class="dl-name" id="mr-fname">—</span>
+            </span>
+          </button>
+          <button class="btn-dl" id="dl-tbe" onclick="downloadFile3('tbe')">
+            <span class="dl-icon">⬇</span>
+            <span class="dl-info">
+              <span>Download TBE Report</span>
+              <span class="dl-name" id="tbe-fname">—</span>
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <footer>
     <span>COMP5 Document Control · QatarEnergy LNG / Saipem JV</span>
     <span id="footer-date">—</span>
@@ -270,16 +328,37 @@ document.getElementById("today-badge").textContent = fmtDate(now);
 document.getElementById("footer-date").textContent = "Generated: " + fmtDate(now);
 
 // ── State ──────────────────────────────────────────────────────────────────
-const files = { 1: null, 2: null };
+const files = { 1: null, 2: null, 3: null };
 
 // ── Drop zones ─────────────────────────────────────────────────────────────
-[1,2].forEach(n => {
-  const dz = document.getElementById("dz"+n);
-  dz.addEventListener("dragover", e => { e.preventDefault(); dz.classList.add("dragover"); });
-  dz.addEventListener("dragleave", () => dz.classList.remove("dragover"));
-  dz.addEventListener("drop", e => { e.preventDefault(); dz.classList.remove("dragover"); const f=e.dataTransfer.files[0]; if(f) setFile(n,f); });
+[1,2,3].forEach(n => {
+  const dz    = document.getElementById("dz"+n);
+  const input = document.getElementById("file"+n);
+
+  // Click anywhere on drop zone → open file picker
+  dz.addEventListener("click", () => input.click());
+
+  // File picked via browser dialog
+  input.addEventListener("change", () => {
+    if (input.files && input.files[0]) setFile(n, input.files[0]);
+  });
+
+  // Drag events — must preventDefault to stop browser downloading the file
+  dz.addEventListener("dragenter", e => { e.preventDefault(); e.stopPropagation(); dz.classList.add("dragover"); });
+  dz.addEventListener("dragover",  e => { e.preventDefault(); e.stopPropagation(); dz.classList.add("dragover"); });
+  dz.addEventListener("dragleave", e => { e.preventDefault(); e.stopPropagation(); dz.classList.remove("dragover"); });
+  dz.addEventListener("drop",      e => {
+    e.preventDefault(); e.stopPropagation();
+    dz.classList.remove("dragover");
+    const f = e.dataTransfer.files[0];
+    if (f) setFile(n, f);
+  });
 });
-function onFileChange(n) { const f=document.getElementById("file"+n).files[0]; if(f) setFile(n,f); }
+
+// Also prevent browser default drop on the whole document
+document.addEventListener("dragover", e => e.preventDefault());
+document.addEventListener("drop",     e => e.preventDefault());
+// file change handled by addEventListener above
 function setFile(n,f) {
   files[n]=f;
   document.getElementById("fname"+n).textContent = "✓ "+f.name;
@@ -396,6 +475,86 @@ function renderComp5Kpis(s, filename) {
     kpiBox("Total Issued",s.count_all)  +
     kpiBox("Week Period", s.week.replace("–","–"));
   document.getElementById("comp5-fname").textContent = filename||"—";
+}
+
+// ── Report 3: MR & TBE ─────────────────────────────────────────────────────
+
+async function loadSummary3() {
+  if (!files[3]) return;
+  showError(3, "");
+  document.getElementById("res3").style.display = "none";
+  document.getElementById("btn3").disabled = true;
+  showSpinner(3, true, "Analysing MR & TBE…");
+
+  try {
+    const fd1 = new FormData(); fd1.append("file", files[3]);
+    const fd2 = new FormData(); fd2.append("file", files[3]);
+    const [mr, tbe] = await Promise.all([
+      fetch("/api/mr/summary",  { method:"POST", body:fd1 }).then(r=>r.json()),
+      fetch("/api/tbe/summary", { method:"POST", body:fd2 }).then(r=>r.json()),
+    ]);
+    if (mr.error)  { showError(3, "MR: "  + mr.error);  return; }
+    if (tbe.error) { showError(3, "TBE: " + tbe.error); return; }
+    renderMrKpis(mr.summary,   mr.filename);
+    renderTbeKpis(tbe.summary, tbe.filename);
+    document.getElementById("res3").style.display = "block";
+  } catch(e) {
+    showError(3, "Network error: " + e.message);
+  } finally {
+    document.getElementById("btn3").disabled = false;
+    showSpinner(3, false);
+  }
+}
+
+async function downloadFile3(type) {
+  if (!files[3]) { alert("Please upload the file again."); return; }
+  const btnId = type === "mr" ? "dl-mr" : "dl-tbe";
+  const btn   = document.getElementById(btnId);
+  btn.disabled = true;
+  btn.querySelectorAll("span")[0].textContent = "⏳";
+
+  const urls = { mr: "/api/mr/download", tbe: "/api/tbe/download" };
+  const fd = new FormData(); fd.append("file", files[3]);
+
+  try {
+    const r = await fetch(urls[type], { method:"POST", body:fd });
+    if (!r.ok) { const t=await r.text(); showError(3, t||"Download failed"); return; }
+    const cd    = r.headers.get("Content-Disposition") || "";
+    const match = cd.match(/filename[^;=
+]*=(?:(\'?['"])(.*?)|([^;
+]*))/);
+    const fname = match ? (match[2]||match[3]||"report.xlsx").trim() : "report.xlsx";
+    const blob  = await r.blob();
+    const url   = URL.createObjectURL(blob);
+    const a     = document.createElement("a");
+    a.href=url; a.download=fname; document.body.appendChild(a);
+    a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  } catch(e) {
+    showError(3, "Download error: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.querySelectorAll("span")[0].textContent = "⬇";
+  }
+}
+
+function renderMrKpis(s, filename) {
+  document.getElementById("kpi-mr").innerHTML =
+    kpiBox("Issued to CPY",         s.issued,     "") +
+    kpiBox("Not Replied ✓",         s.not_rep_v,  "ok") +
+    kpiBox("Expired ⚠",             s.not_rep_e,  s.not_rep_e > 0 ? "alert" : "ok") +
+    kpiBox("Replied — Closed",      s.rep_closed, "") +
+    kpiBox("Replied — Open",        s.rep_open,   s.rep_open > 0 ? "warn" : "");
+  document.getElementById("mr-fname").textContent = filename || "—";
+}
+
+function renderTbeKpis(s, filename) {
+  document.getElementById("kpi-tbe").innerHTML =
+    kpiBox("Issued to CPY",         s.issued,     "") +
+    kpiBox("Not Replied ✓",         s.not_rep_v,  "ok") +
+    kpiBox("Expired ⚠",             s.not_rep_e,  s.not_rep_e > 0 ? "alert" : "ok") +
+    kpiBox("Replied — Closed",      s.rep_closed, "") +
+    kpiBox("Replied — Open",        s.rep_open,   s.rep_open > 0 ? "warn" : "");
+  document.getElementById("tbe-fname").textContent = filename || "—";
 }
 </script>
 </body>
