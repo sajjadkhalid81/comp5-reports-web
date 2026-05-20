@@ -73,7 +73,7 @@
     text-align: center; cursor: pointer; transition: border-color .2s,background .2s; position: relative;
   }
   .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent); background: rgba(232,160,32,.04); }
-  .drop-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .drop-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; pointer-events: none; }
   .drop-icon { font-size: 32px; margin-bottom: 10px; }
   .drop-label { font-size: 13px; color: var(--dim); }
   .drop-label strong { color: var(--accent); }
@@ -169,7 +169,7 @@
     </div>
     <div class="card-body">
       <div class="drop-zone" id="dz1">
-        <input type="file" accept=".xlsx,.xls" id="file1" onchange="onFileChange(1)">
+        <input type="file" accept=".xlsx,.xls" id="file1" >
         <div class="drop-icon">📊</div>
         <div class="drop-label">Drop <strong>TQ-SDR Log</strong> here or click to browse</div>
         <div class="drop-note">COMP5_-_TQ-SDR-CR-ARN-DCR_LOG.xlsx</div>
@@ -226,7 +226,7 @@
     </div>
     <div class="card-body">
       <div class="drop-zone" id="dz2">
-        <input type="file" accept=".xlsx,.xls" id="file2" onchange="onFileChange(2)">
+        <input type="file" accept=".xlsx,.xls" id="file2" >
         <div class="drop-icon">📋</div>
         <div class="drop-label">Drop <strong>COMP5 Register</strong> here or click to browse</div>
         <div class="drop-note">COMP5_REGISTER.xlsx</div>
@@ -269,7 +269,7 @@
     </div>
     <div class="card-body">
       <div class="drop-zone" id="dz3">
-        <input type="file" accept=".xlsx,.xls" id="file3" onchange="onFileChange(3)">
+        <input type="file" accept=".xlsx,.xls" id="file3" >
         <div class="drop-icon">📦</div>
         <div class="drop-label">Drop <strong>COMP5 Register</strong> here or click to browse</div>
         <div class="drop-note">COMP5_REGISTER.xlsx</div>
@@ -332,12 +332,21 @@ const files = { 1: null, 2: null, 3: null };
 
 // ── Drop zones ─────────────────────────────────────────────────────────────
 [1,2,3].forEach(n => {
-  const dz = document.getElementById("dz"+n);
-  dz.addEventListener("dragover", e => { e.preventDefault(); dz.classList.add("dragover"); });
-  dz.addEventListener("dragleave", () => dz.classList.remove("dragover"));
-  dz.addEventListener("drop", e => { e.preventDefault(); dz.classList.remove("dragover"); const f=e.dataTransfer.files[0]; if(f) setFile(n,f); });
+  const dz    = document.getElementById("dz"+n);
+  const input = document.getElementById("file"+n);
+  // Click on drop zone opens file browser
+  dz.addEventListener("click", () => input.click());
+  // File selected via browser
+  input.addEventListener("change", () => { if(input.files[0]) setFile(n, input.files[0]); });
+  // Drag & drop
+  dz.addEventListener("dragover",  e => { e.preventDefault(); dz.classList.add("dragover"); });
+  dz.addEventListener("dragleave", ()  => dz.classList.remove("dragover"));
+  dz.addEventListener("drop",      e  => {
+    e.preventDefault(); dz.classList.remove("dragover");
+    const f = e.dataTransfer.files[0]; if(f) setFile(n, f);
+  });
 });
-function onFileChange(n) { const f=document.getElementById("file"+n).files[0]; if(f) setFile(n,f); }
+// file change handled by addEventListener above
 function setFile(n,f) {
   files[n]=f;
   document.getElementById("fname"+n).textContent = "✓ "+f.name;
