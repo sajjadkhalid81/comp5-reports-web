@@ -321,10 +321,6 @@
 </div>
 
 <script>
-// ── Prevent browser from opening/downloading dropped files ─────────────────
-document.addEventListener("dragover", e => e.preventDefault());
-document.addEventListener("drop",     e => e.preventDefault());
-
 // ── Date ───────────────────────────────────────────────────────────────────
 const now = new Date();
 const fmtDate = d => d.toLocaleDateString("en-GB",{weekday:"short",day:"2-digit",month:"short",year:"numeric"});
@@ -359,7 +355,9 @@ const files = { 1: null, 2: null, 3: null };
   });
 });
 
-// document drop prevention moved to top of script
+// Also prevent browser default drop on the whole document
+document.addEventListener("dragover", e => e.preventDefault());
+document.addEventListener("drop",     e => e.preventDefault());
 // file change handled by addEventListener above
 function setFile(n,f) {
   files[n]=f;
@@ -522,9 +520,7 @@ async function downloadFile3(type) {
     const r = await fetch(urls[type], { method:"POST", body:fd });
     if (!r.ok) { const t=await r.text(); showError(3, t||"Download failed"); return; }
     const cd    = r.headers.get("Content-Disposition") || "";
-    const match = cd.match(/filename[^;=
-]*=(?:(\'?['"])(.*?)|([^;
-]*))/);
+    const match = cd.match(/filename[^;=\n]*=(?:(\\?['"])(.*?)\1|(?:[^\s]+'.*?')?([^;\n]*))/);
     const fname = match ? (match[2]||match[3]||"report.xlsx").trim() : "report.xlsx";
     const blob  = await r.blob();
     const url   = URL.createObjectURL(blob);
