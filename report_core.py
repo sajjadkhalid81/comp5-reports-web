@@ -393,7 +393,7 @@ def _build_tqsdr_summary(wb, title, header_color, kpis, disc_col,
     _c(ws, total_row, 1, "TOTAL", bg=header_color, bold=True, fg=WHITE, align="center")
     _c(ws, total_row, 2, total_cnt(issued),    bg=header_color, bold=True, fg=WHITE, align="center")
     _c(ws, total_row, 3, total_cnt(not_rep_v), bg=header_color, bold=True, fg=WHITE, align="center")
-    _c(ws, total_row, 4, total_cnt(not_rep_e), bg="C00000" if total_cnt(not_rep_e)>0 else header_color, bold=True, fg=WHITE, align="center")
+    _c(ws, total_row, 4, total_cnt(not_rep_e), bg=header_color, bold=True, fg=WHITE, align="center")
     _c(ws, total_row, 5, total_cnt(rep_closed),bg=header_color, bold=True, fg=WHITE, align="center")
     _c(ws, total_row, 6, total_cnt(rep_open),  bg=header_color, bold=True, fg=WHITE, align="center")
     ws.row_dimensions[total_row].height = 18
@@ -401,16 +401,15 @@ def _build_tqsdr_summary(wb, title, header_color, kpis, disc_col,
     # Expired urgent table (only if expired records exist)
     if len(not_rep_e) > 0 and disc_col and disc_col in not_rep_e.columns:
         urgent_row = DISC_HDR_ROW + len(all_discs) + 3
-        ws.merge_cells(f"A{urgent_row}:G{urgent_row}")
+        ws.merge_cells(f"A{urgent_row}:H{urgent_row}")
         urg = ws.cell(urgent_row, 1, "⚠  EXPIRED — URGENT ACTION REQUIRED")
         urg.font      = Font(name="Arial", bold=True, size=11, color=WHITE)
         urg.fill      = PatternFill("solid", fgColor="C00000")
         urg.alignment = Alignment(horizontal="center", vertical="center")
         ws.row_dimensions[urgent_row].height = 22
-        for ci, h in enumerate(["#","Document Number","Discipline","Engineer","Date Issued to CPY","Due Date","Days Overdue"], 1):
+        for ci, h in enumerate(["#","Document Number","Document Title","Discipline","Engineer","Date Issued to CPY","Due Date","Days Overdue"], 1):
             _h(ws, urgent_row+1, ci, h, bg="C00000")
-        doc_col_name = "Document Number"
-        ue_cols = ["Document Number","Discipline","RESPOND DUE DATE","DATE REPLIED","Responsible Engineer"]
+        ws.column_dimensions["C"].width = 45
         for ri2, (_, row_data) in enumerate(not_rep_e.iterrows(), urgent_row+2):
             due = pd.to_datetime(row_data.get("RESPOND DUE DATE"), errors="coerce")
             issued_date = pd.to_datetime(row_data.get("DATE ISSUE TO CPY"), errors="coerce")
@@ -421,13 +420,14 @@ def _build_tqsdr_summary(wb, title, header_color, kpis, disc_col,
             if due is not None and not pd.isna(due):
                 try: days_over = (today_d - due.date()).days
                 except (ValueError, AttributeError): pass
-            _c(ws, ri2, 1, ri2-(urgent_row+1), bg="FFCCCC", align="center", bold=True)
-            _c(ws, ri2, 2, _fmt(row_data.get("Document Number","")),  bg="FFCCCC")
-            _c(ws, ri2, 3, _fmt(row_data.get("Discipline","")),        bg="FFCCCC", align="center")
-            _c(ws, ri2, 4, _fmt(row_data.get("Responsible Engineer","")), bg="FFCCCC")
-            _c(ws, ri2, 5, issued_fmt,                                 bg="FFCCCC", align="center")
-            _c(ws, ri2, 6, due_fmt,                                    bg="FFCCCC", align="center")
-            ov_cell = _c(ws, ri2, 7, f"OVERDUE {days_over}d" if days_over != "" else "", bg="FFCCCC", align="center")
+            _c(ws, ri2, 1, ri2-(urgent_row+1),                            bg="FFCCCC", align="center", bold=True)
+            _c(ws, ri2, 2, _fmt(row_data.get("Document Number","")),      bg="FFCCCC")
+            _c(ws, ri2, 3, _fmt(row_data.get("Title","")),                bg="FFCCCC", wrap=True)
+            _c(ws, ri2, 4, _fmt(row_data.get("Discipline","")),           bg="FFCCCC", align="center")
+            _c(ws, ri2, 5, _fmt(row_data.get("Responsible Engineer","")), bg="FFCCCC")
+            _c(ws, ri2, 6, issued_fmt,                                    bg="FFCCCC", align="center")
+            _c(ws, ri2, 7, due_fmt,                                       bg="FFCCCC", align="center")
+            ov_cell = _c(ws, ri2, 8, f"OVERDUE {days_over}d" if days_over != "" else "", bg="FFCCCC", align="center")
             ov_cell.font = Font(name="Arial", bold=True, color="C00000", size=9)
             ws.row_dimensions[ri2].height = 14
 
@@ -813,6 +813,20 @@ def _build_comp5_summary(wb, df, df_issued, df_not_issued, df_hold, report_date_
         sc.font = Font(name="Arial", bold=True, color=status_fg, size=9)
         ws.row_dimensions[ri].height = 16
 
+    # TOTAL row
+    total_row = HDR_ROW + len(DISC_ORDER) + 1
+    for col in range(1, 8):
+        cell = ws.cell(total_row, col)
+        cell.fill   = PatternFill("solid", fgColor=DARK_BLUE)
+        cell.border = _b()
+        cell.font   = Font(name="Arial", bold=True, size=10, color=WHITE)
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    ws.cell(total_row, 1).value = "TOTAL"
+    ws.cell(total_row, 4).value = len(df)
+    ws.cell(total_row, 5).value = len(df_not_issued)
+    ws.cell(total_row, 6).value = len(df_hold)
+    ws.row_dimensions[total_row].height = 18
+
     # Legend
     leg_row = HDR_ROW + len(DISC_ORDER) + 3
     ws.merge_cells(f"A{leg_row}:G{leg_row}")
@@ -958,6 +972,26 @@ def _build_datewise_tab(wb, df, report_date_str):
         ws.row_dimensions[row].height = 14
         row += 1
 
+    # Section 2 TOTAL row
+    grand_total   = len(df2)
+    grand_not_iss = 0
+    grand_hold    = 0
+    grand_issued  = 0
+    if status_col in df2.columns:
+        s_all = df2[status_col].astype(str).str.strip().str.upper()
+        grand_issued  = (s_all == "ISSUED").sum()
+        grand_not_iss = (s_all == "NOT ISSUED").sum()
+        grand_hold    = s_all.str.contains("CORRECTION|HOLD", na=False).sum()
+    grand_pct_under  = f"{int(round(grand_not_iss/grand_total*100))}%" if grand_total > 0 else "0%"
+    grand_pct_issued = f"{int(round(grand_issued/grand_total*100))}%"  if grand_total > 0 else "0%"
+    _c(ws, row, 1, "TOTAL",          bg=DK_ORANGE, bold=True, fg=WHITE, align="center")
+    _c(ws, row, 2, grand_total,      bg=DK_ORANGE, bold=True, fg=WHITE, align="center")
+    _c(ws, row, 3, grand_not_iss,    bg=DK_ORANGE, bold=True, fg=WHITE, align="center")
+    _c(ws, row, 4, grand_hold,       bg=DK_ORANGE, bold=True, fg=WHITE, align="center")
+    _c(ws, row, 5, grand_pct_under,  bg=DK_ORANGE, bold=True, fg=WHITE, align="center")
+    _c(ws, row, 6, grand_pct_issued, bg=DK_ORANGE, bold=True, fg=WHITE, align="center")
+    ws.row_dimensions[row].height = 18
+
 
 def _build_comp5_detail_tab(wb, tab_name, tab_color, df, alt_bg):
     """
@@ -1020,51 +1054,30 @@ def _build_comp5_detail_tab(wb, tab_name, tab_color, df, alt_bg):
         "NOT ISSUED":     (LT_RED,   "C00000"),
     }
 
-    # Use bulk row writing for performance (avoids iterrows + _c() per cell)
-    ALT_FILL   = PatternFill("solid", fgColor=alt_bg)
-    WHITE_FILL = PatternFill("solid", fgColor=WHITE)
-    ROW_HEIGHT = 14
-
-    STATUS_FILLS = {
-        k: (PatternFill("solid", fgColor=v[0]),
-            Font(name="Arial", bold=True, color=v[1], size=9))
-        for k, v in STATUS_COLORS.items()
-    }
-    DEFAULT_STATUS_FILL = (PatternFill("solid", fgColor=AMBER),
-                           Font(name="Arial", bold=True, color="7F6000", size=9))
-
     for ri, (_, row_data) in enumerate(df.iterrows(), 3):
-        bg        = alt_bg if ri % 2 == 0 else WHITE
-        bg_fill   = ALT_FILL if ri % 2 == 0 else WHITE_FILL
+        bg = alt_bg if ri % 2 == 0 else WHITE
         disc_code = str(row_data.get("Discipline","")).strip().upper()
         disc_name = DISC_MAP.get(disc_code, disc_code)
         status    = str(row_data.get(status_col,"")).strip()
-        sbg_fill, sfont = STATUS_FILLS.get(status.upper(), DEFAULT_STATUS_FILL)
+        sbg, sfg  = STATUS_COLORS.get(status.upper(), (AMBER, "7F6000"))
 
+        _c(ws, ri,  1, ri-2, bg=bg, align="center")
+        # Client doc no with rev
         client_no = _g(row_data, "CLIENT DOCUMENT NO. with REV", "CLIENTDOCUMENTNO.")
-
-        # Write all values at once using direct cell assignment (faster than _c)
-        row_vals = [
-            ri-2,
-            client_no,
-            _g(row_data, "Saipem Number","SAIPEM NUMBER","Saipem Doc No"),
-            _g(row_data, "Rev"),
-            _g(row_data, "TITLE / DESCRIPTION","Title","TITLE"),
-            disc_code,
-            disc_name,
-            _g(row_data, "Issuing Description"),
-            _g(row_data, "Date Issued"),
-            _g(row_data, "Transmittal Reference"),
-            _g(row_data, "Issued by DC"),
-            _g(row_data, "PCON TR"),
-            status,
-        ]
-        for ci, val in enumerate(row_vals, 1):
-            cell = ws.cell(row=ri, column=ci, value=val)
-            cell.fill = bg_fill if ci < 13 else sbg_fill
-            if ci == 13:
-                cell.font = sfont
-        ws.row_dimensions[ri].height = ROW_HEIGHT
+        _c(ws, ri,  2, client_no, bg=bg)
+        _c(ws, ri,  3, _g(row_data, "Saipem Number","SAIPEM NUMBER","Saipem Doc No"), bg=bg)
+        _c(ws, ri,  4, _g(row_data, "Rev"), bg=bg, align="center")
+        _c(ws, ri,  5, _g(row_data, "TITLE / DESCRIPTION","Title","TITLE"), bg=bg)
+        _c(ws, ri,  6, disc_code, bg=bg, align="center")
+        _c(ws, ri,  7, disc_name, bg=bg)
+        _c(ws, ri,  8, _g(row_data, "Issuing Description"), bg=bg, align="center")
+        _c(ws, ri,  9, _g(row_data, "Date Issued"), bg=bg, align="center")
+        _c(ws, ri, 10, _g(row_data, "Transmittal Reference"), bg=bg)
+        _c(ws, ri, 11, _g(row_data, "Issued by DC"), bg=bg)
+        _c(ws, ri, 12, _g(row_data, "PCON TR"), bg=bg)
+        sc = _c(ws, ri, 13, status, bg=sbg, align="center", bold=True)
+        sc.font = Font(name="Arial", bold=True, color=sfg, size=9)
+        ws.row_dimensions[ri].height = 14
 
 
 def generate_comp5(raw: bytes) -> dict:

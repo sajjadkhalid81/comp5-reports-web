@@ -340,7 +340,7 @@ def _build_summary(wb, title, header_color,
     # ── Expired urgent table ──
     if len(not_rep_e) > 0:
         urg_row = total_row + 3
-        ws.merge_cells(f"A{urg_row}:F{urg_row}")
+        ws.merge_cells(f"A{urg_row}:G{urg_row}")
         urg = ws.cell(urg_row, 1, "⚠  EXPIRED — URGENT ACTION REQUIRED")
         urg.font      = Font(name="Arial", bold=True, size=11, color=WHITE)
         urg.fill      = PatternFill("solid", fgColor="C00000")
@@ -348,10 +348,11 @@ def _build_summary(wb, title, header_color,
         ws.row_dimensions[urg_row].height = 22
 
         for ci, h in enumerate(
-            ["#", "Document No. (with Rev)", "Discipline",
+            ["#", "Document No.", "Document Title", "Discipline",
              "Date Issued to CPY", "Due Date", "Days Overdue"], 1
         ):
             _h(ws, urg_row + 1, ci, h, bg="C00000")
+        ws.column_dimensions[get_column_letter(3)].width = 45
         ws.row_dimensions[urg_row + 1].height = 20
 
         today_d = datetime.today().date()
@@ -363,11 +364,12 @@ def _build_summary(wb, title, header_color,
             disc_name = DISC_MAP.get(str(row_data.get("_DISC","")).strip(), str(row_data.get("_DISC","")))
 
             _c(ws, ri2, 1, ri2 - (urg_row + 1),                              bg="FFCCCC", align="center", bold=True)
-            _c(ws, ri2, 2, _fmt(row_data.get("CLIENT DOCUMENT NO.","")),          bg="FFCCCC")
-            _c(ws, ri2, 3, disc_name,                                         bg="FFCCCC", align="center")
-            _c(ws, ri2, 4, _fmt(issued_dt),                                   bg="FFCCCC", align="center")
-            _c(ws, ri2, 5, _fmt(due),                                         bg="FFCCCC", align="center")
-            ov = _c(ws, ri2, 6,
+            _c(ws, ri2, 2, _fmt(row_data.get("CLIENT DOCUMENT NO.","")),      bg="FFCCCC")
+            _c(ws, ri2, 3, _fmt(row_data.get("DOCUMENT TITLE","")),           bg="FFCCCC", wrap=True)
+            _c(ws, ri2, 4, disc_name,                                         bg="FFCCCC", align="center")
+            _c(ws, ri2, 5, _fmt(issued_dt),                                   bg="FFCCCC", align="center")
+            _c(ws, ri2, 6, _fmt(due),                                         bg="FFCCCC", align="center")
+            ov = _c(ws, ri2, 7,
                     f"OVERDUE {days_over}d" if days_over != "" else "",
                     bg="FFCCCC", align="center")
             ov.font = Font(name="Arial", bold=True, color="C00000", size=9)
