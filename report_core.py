@@ -41,12 +41,24 @@ def _b(med=False):
 def _c(ws, r, c, v="", bold=False, fg=BLACK, bg=None,
         align="left", wrap=False, sz=9, brd=True):
     cell = ws.cell(row=r, column=c, value=v)
-    cell.font      = Font(name="Arial", bold=bold, color=fg, size=sz)
-    cell.alignment = Alignment(horizontal=align, vertical="center", wrap_text=wrap)
-    if bg:
-        cell.fill = PatternFill("solid", fgColor=bg)
-    if brd:
-        cell.border = _b()
+    try:
+        cell.font = Font(name="Arial", bold=bold, color=fg, size=sz)
+    except Exception:
+        pass
+    try:
+        cell.alignment = Alignment(horizontal=align, vertical="center", wrap_text=wrap)
+    except Exception:
+        pass
+    try:
+        if bg:
+            cell.fill = PatternFill("solid", fgColor=bg)
+    except Exception:
+        pass
+    try:
+        if brd:
+            cell.border = _b()
+    except Exception:
+        pass
     return cell
 
 def _h(ws, r, c, lbl, bg=DARK_BLUE, fg=WHITE, sz=9):
@@ -817,9 +829,9 @@ def _build_comp5_summary(wb, df, df_issued, df_not_issued, df_hold, report_date_
     total_row = HDR_ROW + len(DISC_ORDER) + 1
     for col in range(1, 8):
         cell = ws.cell(total_row, col)
-        cell.fill   = PatternFill("solid", fgColor=DARK_BLUE)
-        cell.border = _b()
-        cell.font   = Font(name="Arial", bold=True, size=10, color=WHITE)
+        cell.fill      = PatternFill("solid", fgColor=DARK_BLUE)
+        cell.border    = _b()
+        cell.font      = Font(name="Arial", bold=True, size=10, color=WHITE)
         cell.alignment = Alignment(horizontal="center", vertical="center")
     ws.cell(total_row, 1).value = "TOTAL"
     ws.cell(total_row, 4).value = len(df)
@@ -984,12 +996,18 @@ def _build_datewise_tab(wb, df, report_date_str):
         grand_hold    = s_all.str.contains("CORRECTION|HOLD", na=False).sum()
     grand_pct_under  = f"{int(round(grand_not_iss/grand_total*100))}%" if grand_total > 0 else "0%"
     grand_pct_issued = f"{int(round(grand_issued/grand_total*100))}%"  if grand_total > 0 else "0%"
-    _c(ws, row, 1, "TOTAL",          bg=DK_ORANGE, bold=True, fg=WHITE, align="center")
-    _c(ws, row, 2, grand_total,      bg=DK_ORANGE, bold=True, fg=WHITE, align="center")
-    _c(ws, row, 3, grand_not_iss,    bg=DK_ORANGE, bold=True, fg=WHITE, align="center")
-    _c(ws, row, 4, grand_hold,       bg=DK_ORANGE, bold=True, fg=WHITE, align="center")
-    _c(ws, row, 5, grand_pct_under,  bg=DK_ORANGE, bold=True, fg=WHITE, align="center")
-    _c(ws, row, 6, grand_pct_issued, bg=DK_ORANGE, bold=True, fg=WHITE, align="center")
+    for col in range(1, 7):
+        cell = ws.cell(row, col)
+        cell.fill      = PatternFill("solid", fgColor=DK_ORANGE)
+        cell.border    = _b()
+        cell.font      = Font(name="Arial", bold=True, size=9, color=WHITE)
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    ws.cell(row, 1).value = "TOTAL"
+    ws.cell(row, 2).value = grand_total
+    ws.cell(row, 3).value = grand_not_iss
+    ws.cell(row, 4).value = grand_hold
+    ws.cell(row, 5).value = grand_pct_under
+    ws.cell(row, 6).value = grand_pct_issued
     ws.row_dimensions[row].height = 18
 
 
