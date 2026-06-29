@@ -749,7 +749,7 @@ def _build_comp5_summary(wb, df, df_issued, df_not_issued, df_hold, report_date_
     # Sub-title
     ws.merge_cells("A2:G2")
     s = ws["A2"]
-    s.value     = f"Cut-Off Date: {report_date_str}  |  CONFIDENTIAL"
+    s.value     = f"Cut-Off Date: {report_date_str}  |  CONFIDENTIAL  |  Prepared by: Khalid Sajjad"
     s.font      = Font(name="Arial", italic=True, size=9, color=GREY595)
     s.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[2].height = 16
@@ -825,18 +825,42 @@ def _build_comp5_summary(wb, df, df_issued, df_not_issued, df_hold, report_date_
         sc.font = Font(name="Arial", bold=True, color=status_fg, size=9)
         ws.row_dimensions[ri].height = 16
 
-    # TOTAL row
+    # TOTAL row — A:C merged for label, D=issued, E=under process, F=pending, G=overall status
     total_row = HDR_ROW + len(DISC_ORDER) + 1
+    TOTAL_FILL   = PatternFill("solid", fgColor=DARK_BLUE)
+    TOTAL_FONT   = Font(name="Arial", bold=True, size=10, color=WHITE)
+    TOTAL_ALIGN  = Alignment(horizontal="center", vertical="center")
+    TOTAL_BORDER = _b()
+    # Fill all 7 cells first
     for col in range(1, 8):
         cell = ws.cell(total_row, col)
-        cell.fill      = PatternFill("solid", fgColor=DARK_BLUE)
-        cell.border    = _b()
-        cell.font      = Font(name="Arial", bold=True, size=10, color=WHITE)
-        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.fill      = TOTAL_FILL
+        cell.font      = TOTAL_FONT
+        cell.alignment = TOTAL_ALIGN
+        cell.border    = TOTAL_BORDER
+    # Merge A:C for TOTAL label
+    ws.merge_cells(start_row=total_row, start_column=1,
+                   end_row=total_row,   end_column=3)
     ws.cell(total_row, 1).value = "TOTAL"
+    ws.cell(total_row, 1).font      = TOTAL_FONT
+    ws.cell(total_row, 1).fill      = TOTAL_FILL
+    ws.cell(total_row, 1).alignment = TOTAL_ALIGN
+    # Values
     ws.cell(total_row, 4).value = len(df)
     ws.cell(total_row, 5).value = len(df_not_issued)
     ws.cell(total_row, 6).value = len(df_hold)
+    # G17 — overall % pending status
+    total_pending = len(df_not_issued) + len(df_hold)
+    total_all     = len(df)
+    if total_all > 0:
+        pct = int(round(total_pending / total_all * 100))
+        if pct == 0:
+            status_txt = "Issued (0% Pending)"
+        else:
+            status_txt = f"{pct}% Pending"
+    else:
+        status_txt = ""
+    ws.cell(total_row, 7).value = status_txt
     ws.row_dimensions[total_row].height = 18
 
     # Legend
