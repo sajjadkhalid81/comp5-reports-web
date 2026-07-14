@@ -41,12 +41,24 @@ def _b(med=False):
 def _c(ws, r, c, v="", bold=False, fg=BLACK, bg=None,
         align="left", wrap=False, sz=9, brd=True):
     cell = ws.cell(row=r, column=c, value=v)
-    cell.font      = Font(name="Arial", bold=bold, color=fg, size=sz)
-    cell.alignment = Alignment(horizontal=align, vertical="center", wrap_text=wrap)
-    if bg:
-        cell.fill = PatternFill("solid", fgColor=bg)
-    if brd:
-        cell.border = _b()
+    try:
+        cell.font = Font(name="Arial", bold=bold, color=fg, size=sz)
+    except Exception:
+        pass
+    try:
+        cell.alignment = Alignment(horizontal=align, vertical="center", wrap_text=wrap)
+    except Exception:
+        pass
+    try:
+        if bg:
+            cell.fill = PatternFill("solid", fgColor=bg)
+    except Exception:
+        pass
+    try:
+        if brd:
+            cell.border = _b()
+    except Exception:
+        pass
     return cell
 
 def _h(ws, r, c, lbl, bg=DARK_BLUE, fg=WHITE, sz=9):
@@ -393,7 +405,7 @@ def _build_tqsdr_summary(wb, title, header_color, kpis, disc_col,
     _c(ws, total_row, 1, "TOTAL", bg=header_color, bold=True, fg=WHITE, align="center")
     _c(ws, total_row, 2, total_cnt(issued),    bg=header_color, bold=True, fg=WHITE, align="center")
     _c(ws, total_row, 3, total_cnt(not_rep_v), bg=header_color, bold=True, fg=WHITE, align="center")
-    _c(ws, total_row, 4, total_cnt(not_rep_e), bg="C00000" if total_cnt(not_rep_e)>0 else header_color, bold=True, fg=WHITE, align="center")
+    _c(ws, total_row, 4, total_cnt(not_rep_e), bg=header_color, bold=True, fg=WHITE, align="center")
     _c(ws, total_row, 5, total_cnt(rep_closed),bg=header_color, bold=True, fg=WHITE, align="center")
     _c(ws, total_row, 6, total_cnt(rep_open),  bg=header_color, bold=True, fg=WHITE, align="center")
     ws.row_dimensions[total_row].height = 18
@@ -737,7 +749,7 @@ def _build_comp5_summary(wb, df, df_issued, df_not_issued, df_hold, report_date_
     # Sub-title
     ws.merge_cells("A2:G2")
     s = ws["A2"]
-    s.value     = f"Cut-Off Date: {report_date_str}  |  CONFIDENTIAL"
+    s.value     = f"Cut-Off Date: {report_date_str}  |  CONFIDENTIAL  |  Prepared by: Khalid Sajjad"
     s.font      = Font(name="Arial", italic=True, size=9, color=GREY595)
     s.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[2].height = 16
@@ -813,15 +825,42 @@ def _build_comp5_summary(wb, df, df_issued, df_not_issued, df_hold, report_date_
         sc.font = Font(name="Arial", bold=True, color=status_fg, size=9)
         ws.row_dimensions[ri].height = 16
 
-    # TOTAL row — simple sum of all discipline rows
+    # TOTAL row — A:C merged for label, D=issued, E=under process, F=pending, G=overall status
     total_row = HDR_ROW + len(DISC_ORDER) + 1
-    _c(ws, total_row, 1, "TOTAL",      bg=DARK_BLUE, bold=True, fg=WHITE, align="center")
-    _c(ws, total_row, 2, "",           bg=DARK_BLUE, bold=True, fg=WHITE, align="center")
-    _c(ws, total_row, 3, "",           bg=DARK_BLUE, bold=True, fg=WHITE, align="center")
-    _c(ws, total_row, 4, len(df),          bg=DARK_BLUE, bold=True, fg=WHITE, align="center")
-    _c(ws, total_row, 5, len(df_not_issued),bg=DARK_BLUE, bold=True, fg=WHITE, align="center")
-    _c(ws, total_row, 6, len(df_hold),     bg=DARK_BLUE, bold=True, fg=WHITE, align="center")
-    _c(ws, total_row, 7, "",           bg=DARK_BLUE, bold=True, fg=WHITE, align="center")
+    TOTAL_FILL   = PatternFill("solid", fgColor=DARK_BLUE)
+    TOTAL_FONT   = Font(name="Arial", bold=True, size=10, color=WHITE)
+    TOTAL_ALIGN  = Alignment(horizontal="center", vertical="center")
+    TOTAL_BORDER = _b()
+    # Fill all 7 cells first
+    for col in range(1, 8):
+        cell = ws.cell(total_row, col)
+        cell.fill      = TOTAL_FILL
+        cell.font      = TOTAL_FONT
+        cell.alignment = TOTAL_ALIGN
+        cell.border    = TOTAL_BORDER
+    # Merge A:C for TOTAL label
+    ws.merge_cells(start_row=total_row, start_column=1,
+                   end_row=total_row,   end_column=3)
+    ws.cell(total_row, 1).value = "TOTAL"
+    ws.cell(total_row, 1).font      = TOTAL_FONT
+    ws.cell(total_row, 1).fill      = TOTAL_FILL
+    ws.cell(total_row, 1).alignment = TOTAL_ALIGN
+    # Values
+    ws.cell(total_row, 4).value = len(df)
+    ws.cell(total_row, 5).value = len(df_not_issued)
+    ws.cell(total_row, 6).value = len(df_hold)
+    # G17 — overall % pending status
+    total_pending = len(df_not_issued) + len(df_hold)
+    total_all     = len(df)
+    if total_all > 0:
+        pct = int(round(total_pending / total_all * 100))
+        if pct == 0:
+            status_txt = "Issued (0% Pending)"
+        else:
+            status_txt = f"{pct}% Pending"
+    else:
+        status_txt = ""
+    ws.cell(total_row, 7).value = status_txt
     ws.row_dimensions[total_row].height = 18
 
     # Legend
@@ -981,12 +1020,44 @@ def _build_datewise_tab(wb, df, report_date_str):
         grand_hold    = s_all.str.contains("CORRECTION|HOLD", na=False).sum()
     grand_pct_under  = f"{int(round(grand_not_iss/grand_total*100))}%" if grand_total > 0 else "0%"
     grand_pct_issued = f"{int(round(grand_issued/grand_total*100))}%"  if grand_total > 0 else "0%"
-    _c(ws, row, 1, "TOTAL",          bg=DK_ORANGE, bold=True, fg=WHITE, align="center")
-    _c(ws, row, 2, grand_total,      bg=DK_ORANGE, bold=True, fg=WHITE, align="center")
-    _c(ws, row, 3, grand_not_iss,    bg=DK_ORANGE, bold=True, fg=WHITE, align="center")
-    _c(ws, row, 4, grand_hold,       bg=DK_ORANGE, bold=True, fg=WHITE, align="center")
-    _c(ws, row, 5, grand_pct_under,  bg=DK_ORANGE, bold=True, fg=WHITE, align="center")
-    _c(ws, row, 6, grand_pct_issued, bg=DK_ORANGE, bold=True, fg=WHITE, align="center")
+    for col in range(1, 7):
+        cell = ws.cell(row, col)
+        cell.fill      = PatternFill("solid", fgColor=DK_ORANGE)
+        cell.border    = _b()
+        cell.font      = Font(name="Arial", bold=True, size=9, color=WHITE)
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    ws.cell(row, 1).value = "TOTAL"
+    ws.cell(row, 2).value = grand_total
+    ws.cell(row, 3).value = grand_not_iss
+    ws.cell(row, 4).value = grand_hold
+    ws.cell(row, 5).value = grand_pct_under
+    ws.cell(row, 6).value = grand_pct_issued
+    ws.row_dimensions[row].height = 18
+
+    # Section 2 TOTAL row
+    grand_total   = len(df2)
+    grand_not_iss = 0
+    grand_hold    = 0
+    grand_issued  = 0
+    if status_col in df2.columns:
+        s_all = df2[status_col].astype(str).str.strip().str.upper()
+        grand_issued  = (s_all == "ISSUED").sum()
+        grand_not_iss = (s_all == "NOT ISSUED").sum()
+        grand_hold    = s_all.str.contains("CORRECTION|HOLD", na=False).sum()
+    grand_pct_under  = f"{int(round(grand_not_iss/grand_total*100))}%" if grand_total > 0 else "0%"
+    grand_pct_issued = f"{int(round(grand_issued/grand_total*100))}%"  if grand_total > 0 else "0%"
+    for col in range(1, 7):
+        cell = ws.cell(row, col)
+        cell.fill      = PatternFill("solid", fgColor=DK_ORANGE)
+        cell.border    = _b()
+        cell.font      = Font(name="Arial", bold=True, size=9, color=WHITE)
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    ws.cell(row, 1).value = "TOTAL"
+    ws.cell(row, 2).value = grand_total
+    ws.cell(row, 3).value = grand_not_iss
+    ws.cell(row, 4).value = grand_hold
+    ws.cell(row, 5).value = grand_pct_under
+    ws.cell(row, 6).value = grand_pct_issued
     ws.row_dimensions[row].height = 18
 
 
@@ -1051,29 +1122,43 @@ def _build_comp5_detail_tab(wb, tab_name, tab_color, df, alt_bg):
         "NOT ISSUED":     (LT_RED,   "C00000"),
     }
 
+    ALT_FILL   = PatternFill("solid", fgColor=alt_bg)
+    WHITE_FILL = PatternFill("solid", fgColor=WHITE)
+    STATUS_FILLS = {
+        k: (PatternFill("solid", fgColor=v[0]),
+            Font(name="Arial", bold=True, color=v[1], size=9))
+        for k, v in STATUS_COLORS.items()
+    }
+    DEFAULT_STATUS = (PatternFill("solid", fgColor=AMBER),
+                      Font(name="Arial", bold=True, color="7F6000", size=9))
+
     for ri, (_, row_data) in enumerate(df.iterrows(), 3):
-        bg = alt_bg if ri % 2 == 0 else WHITE
+        bg_fill   = ALT_FILL if ri % 2 == 0 else WHITE_FILL
         disc_code = str(row_data.get("Discipline","")).strip().upper()
         disc_name = DISC_MAP.get(disc_code, disc_code)
         status    = str(row_data.get(status_col,"")).strip()
-        sbg, sfg  = STATUS_COLORS.get(status.upper(), (AMBER, "7F6000"))
-
-        _c(ws, ri,  1, ri-2, bg=bg, align="center")
-        # Client doc no with rev
+        sbg_fill, sfont = STATUS_FILLS.get(status.upper(), DEFAULT_STATUS)
         client_no = _g(row_data, "CLIENT DOCUMENT NO. with REV", "CLIENTDOCUMENTNO.")
-        _c(ws, ri,  2, client_no, bg=bg)
-        _c(ws, ri,  3, _g(row_data, "Saipem Number","SAIPEM NUMBER","Saipem Doc No"), bg=bg)
-        _c(ws, ri,  4, _g(row_data, "Rev"), bg=bg, align="center")
-        _c(ws, ri,  5, _g(row_data, "TITLE / DESCRIPTION","Title","TITLE"), bg=bg)
-        _c(ws, ri,  6, disc_code, bg=bg, align="center")
-        _c(ws, ri,  7, disc_name, bg=bg)
-        _c(ws, ri,  8, _g(row_data, "Issuing Description"), bg=bg, align="center")
-        _c(ws, ri,  9, _g(row_data, "Date Issued"), bg=bg, align="center")
-        _c(ws, ri, 10, _g(row_data, "Transmittal Reference"), bg=bg)
-        _c(ws, ri, 11, _g(row_data, "Issued by DC"), bg=bg)
-        _c(ws, ri, 12, _g(row_data, "PCON TR"), bg=bg)
-        sc = _c(ws, ri, 13, status, bg=sbg, align="center", bold=True)
-        sc.font = Font(name="Arial", bold=True, color=sfg, size=9)
+        row_vals = [
+            ri-2,
+            client_no,
+            _g(row_data, "Saipem Number","SAIPEM NUMBER","Saipem Doc No"),
+            _g(row_data, "Rev"),
+            _g(row_data, "TITLE / DESCRIPTION","Title","TITLE"),
+            disc_code,
+            disc_name,
+            _g(row_data, "Issuing Description"),
+            _g(row_data, "Date Issued"),
+            _g(row_data, "Transmittal Reference"),
+            _g(row_data, "Issued by DC"),
+            _g(row_data, "PCON TR"),
+            status,
+        ]
+        for ci, val in enumerate(row_vals, 1):
+            cell = ws.cell(row=ri, column=ci, value=val)
+            cell.fill = bg_fill if ci < 13 else sbg_fill
+            if ci == 13:
+                cell.font = sfont
         ws.row_dimensions[ri].height = 14
 
 
