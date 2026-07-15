@@ -168,8 +168,8 @@
       </div>
     </div>
     <div class="card-body">
+      <input type="file" accept=".xlsx,.xls" id="file1" style="display:none">
       <div class="drop-zone" id="dz1">
-        <input type="file" accept=".xlsx,.xls" id="file1" >
         <div class="drop-icon">📊</div>
         <div class="drop-label">Drop <strong>TQ-SDR Log</strong> here or click to browse</div>
         <div class="drop-note">COMP5_-_TQ-SDR-CR-ARN-DCR_LOG.xlsx</div>
@@ -225,8 +225,8 @@
       </div>
     </div>
     <div class="card-body">
+      <input type="file" accept=".xlsx,.xls" id="file2" style="display:none">
       <div class="drop-zone" id="dz2">
-        <input type="file" accept=".xlsx,.xls" id="file2" >
         <div class="drop-icon">📋</div>
         <div class="drop-label">Drop <strong>COMP5 Register</strong> here or click to browse</div>
         <div class="drop-note">COMP5_REGISTER.xlsx</div>
@@ -268,8 +268,8 @@
       </div>
     </div>
     <div class="card-body">
+      <input type="file" accept=".xlsx,.xls" id="file3" style="display:none">
       <div class="drop-zone" id="dz3">
-        <input type="file" accept=".xlsx,.xls" id="file3" >
         <div class="drop-icon">📦</div>
         <div class="drop-label">Drop <strong>COMP5 Register</strong> here or click to browse</div>
         <div class="drop-note">COMP5_REGISTER.xlsx</div>
@@ -314,6 +314,55 @@
     </div>
   </div>
 
+  <!-- ── Report 4: MVDR ── -->
+  <div class="report-card">
+    <div class="card-header">
+      <div class="card-num">4</div>
+      <div>
+        <div class="card-title">MVDR — Vendor Documents Status</div>
+        <div class="card-sub">COMP5_MVDR__Log.xlsx &nbsp;·&nbsp; Sheet: MasterVDRLog</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <input type="file" accept=".xlsx,.xls" id="file4" style="display:none">
+      <div class="drop-zone" id="dz4">
+        <div class="drop-icon">🏭</div>
+        <div class="drop-label">Drop <strong>MVDR Log</strong> here or click to browse</div>
+        <div class="drop-note">COMP5_MVDR__Log.xlsx</div>
+        <div class="file-chosen" id="fname4"></div>
+      </div>
+      <button class="btn-generate" id="btn4" onclick="loadSummary4()" disabled>
+        Analyse &amp; Show Summary
+      </button>
+      <div class="spinner" id="spin4">
+        <div class="spinner-ring"></div>
+        <div class="spinner-label" id="spin-label4">Processing…</div>
+      </div>
+      <div class="error-box" id="err4"></div>
+      <div class="results" id="res4">
+        <div class="two-col">
+          <div>
+            <div class="results-title">🏭 Section 1 — Vendor / Saipem</div>
+            <div class="kpi-grid" id="kpi-mvdr-vend"></div>
+          </div>
+          <div>
+            <div class="results-title">🏢 Section 2 — Saipem / CPY</div>
+            <div class="kpi-grid" id="kpi-mvdr-cpy"></div>
+          </div>
+        </div>
+        <div class="dl-row">
+          <button class="btn-dl" id="dl-mvdr" onclick="downloadFile4()">
+            <span class="dl-icon">⬇</span>
+            <span class="dl-info">
+              <span>Download MVDR Report</span>
+              <span class="dl-name" id="mvdr-fname">—</span>
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <footer>
     <span>COMP5 Document Control · QatarEnergy LNG / Saipem JV</span>
     <span id="footer-date">—</span>
@@ -328,10 +377,10 @@ document.getElementById("today-badge").textContent = fmtDate(now);
 document.getElementById("footer-date").textContent = "Generated: " + fmtDate(now);
 
 // ── State ──────────────────────────────────────────────────────────────────
-const files = { 1: null, 2: null, 3: null };
+const files = { 1: null, 2: null, 3: null, 4: null };
 
 // ── Drop zones ─────────────────────────────────────────────────────────────
-[1,2,3].forEach(n => {
+[1,2,3,4].forEach(n => {
   const dz    = document.getElementById("dz"+n);
   const input = document.getElementById("file"+n);
 
@@ -529,6 +578,72 @@ async function downloadFile3(type) {
     a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
   } catch(e) {
     showError(3, "Download error: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.querySelectorAll("span")[0].textContent = "⬇";
+  }
+}
+
+// ── Report 4: MVDR ──────────────────────────────────────────────────────────
+async function loadSummary4() {
+  if (!files[4]) return;
+  showError(4, "");
+  document.getElementById("res4").style.display = "none";
+  document.getElementById("btn4").disabled = true;
+  showSpinner(4, true, "Analysing MVDR…");
+
+  try {
+    const fd = new FormData(); fd.append("file", files[4]);
+    const r = await fetch("/api/mvdr/summary", { method:"POST", body:fd });
+    const data = await r.json();
+    if (data.error) { showError(4, data.error); return; }
+    renderMvdrKpis(data.summary, data.filename);
+    document.getElementById("res4").style.display = "block";
+  } catch(e) {
+    showError(4, "Network error: " + e.message);
+  } finally {
+    document.getElementById("btn4").disabled = false;
+    showSpinner(4, false);
+  }
+}
+
+function renderMvdrKpis(s, filename) {
+  document.getElementById("kpi-mvdr-vend").innerHTML =
+    kpiBox("Not Submitted",     s.vend_not_sub,   s.vend_not_sub > 0 ? "warn" : "ok") +
+    kpiBox("Under SPM Review",  s.vend_under_rev, "") +
+    kpiBox("Pending w/ Vendor", s.vend_pending,   s.vend_pending > 0 ? "alert" : "ok") +
+    kpiBox("Code A ✓",          s.vend_code_a,    "ok") +
+    kpiBox("Total Docs",        s.total,          "");
+  document.getElementById("kpi-mvdr-cpy").innerHTML =
+    kpiBox("Not Submitted",     s.cpy_not_sub,    s.cpy_not_sub > 0 ? "warn" : "ok") +
+    kpiBox("Under CPY Review",  s.cpy_under_rev,  "") +
+    kpiBox("Under Consolidation", s.cpy_consol,   s.cpy_consol > 0 ? "warn" : "") +
+    kpiBox("Pending w/ Vendor", s.cpy_pending,    s.cpy_pending > 0 ? "alert" : "ok") +
+    kpiBox("Code A ✓",          s.cpy_code_a,     "ok");
+  document.getElementById("mvdr-fname").textContent = filename || "—";
+}
+
+async function downloadFile4() {
+  if (!files[4]) { alert("Please upload the file again."); return; }
+  const btn = document.getElementById("dl-mvdr");
+  btn.disabled = true;
+  btn.querySelectorAll("span")[0].textContent = "⏳";
+
+  const fd = new FormData(); fd.append("file", files[4]);
+
+  try {
+    const r = await fetch("/api/mvdr/download", { method:"POST", body:fd });
+    if (!r.ok) { const t=await r.text(); showError(4, t||"Download failed"); return; }
+    const cd    = r.headers.get("Content-Disposition") || "";
+    const match = cd.match(/filename[^;=\n]*=(?:(\\?['"])(.*?)\1|(?:[^\s]+'.*?')?([^;\n]*))/);
+    const fname = match ? (match[2]||match[3]||"report.xlsx").trim() : "report.xlsx";
+    const blob  = await r.blob();
+    const url   = URL.createObjectURL(blob);
+    const a     = document.createElement("a");
+    a.href=url; a.download=fname; document.body.appendChild(a);
+    a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  } catch(e) {
+    showError(4, "Network error: " + e.message);
   } finally {
     btn.disabled = false;
     btn.querySelectorAll("span")[0].textContent = "⬇";
