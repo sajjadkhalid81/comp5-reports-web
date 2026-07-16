@@ -211,6 +211,106 @@ def _build_data_tab(wb,tab_name,tab_color,df_tab,alt_bg,date_str):
             except Exception: pass
         ws.row_dimensions[ri].height=14
 
+# ── PO-wise summary tab ──────────────────────────────────────────────────────
+def _build_po_wise_tab(wb, df, date_str):
+    ws = wb.create_sheet("PO WISE SUMMARY")
+    ws.sheet_properties.tabColor = "0D4A55"
+
+    col_widths = [13,13,13,13,13,13]
+    for ci, w in enumerate(col_widths, 1):
+        ws.column_dimensions[get_column_letter(ci)].width = w
+
+    # Title
+    ws.merge_cells("A1:F1")
+    t = ws["A1"]
+    t.value = f"COMP5 — MVDR PO WISE SUMMARY  |  {date_str}"
+    t.font = Font(name="Arial", bold=True, size=13, color=WHITE)
+    t.fill = PatternFill("solid", fgColor=TEAL)
+    t.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 32
+
+    ws.merge_cells("A2:F2")
+    s = ws["A2"]
+    s.value = "Prepared by: Khalid Sajjad  |  CONFIDENTIAL"
+    s.font = Font(name="Arial", italic=True, size=9, color=GREY)
+    s.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[2].height = 14
+
+    row = 4
+    for (po, desc, vnd), grp in df.groupby(["_PO","_DSC","_VND"]):
+        vc = grp["_VS"].value_counts()
+        cc = grp["_CS"].value_counts()
+        n  = len(grp)
+
+        # PO banner
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=6)
+        b = ws.cell(row, 1, f"PO {po}  —  {desc}  —  {vnd}   ({n} documents)")
+        b.font = Font(name="Arial", bold=True, size=11, color=WHITE)
+        b.fill = PatternFill("solid", fgColor="0D4A55")
+        b.alignment = Alignment(horizontal="center", vertical="center")
+        ws.row_dimensions[row].height = 22
+        row += 1
+
+        # Section 1 sub-banner
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=6)
+        s1 = ws.cell(row, 1, "SECTION 1 — VENDOR / SAIPEM")
+        s1.font = Font(name="Arial", bold=True, size=9, color=WHITE)
+        s1.fill = PatternFill("solid", fgColor=TEAL)
+        s1.alignment = Alignment(horizontal="center", vertical="center")
+        ws.row_dimensions[row].height = 16
+        row += 1
+
+        sec1 = [("Not Submitted\nby Vendor", int(vc.get("Not Submitted by Vendor",0)), TAB_RED),
+                ("Under SPM\nReview",        int(vc.get("Under Saipem Review",0)),      DK_BLUE),
+                ("Pending\nwith Vendor",     int(vc.get("Pending with Vendor",0)),       ORANGE),
+                ("Code A\nAccepted",         int(vc.get("Code A — Saipem Accepted",0)), DK_GREEN),
+                ("Total\nDocuments",         n,                                          TEAL)]
+        for ci, (lbl, cnt, bg) in enumerate(sec1, 1):
+            lc = ws.cell(row, ci, lbl)
+            lc.font = Font(name="Arial", bold=True, size=8, color=WHITE)
+            lc.fill = PatternFill("solid", fgColor=bg)
+            lc.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            lc.border = _b()
+            nc = ws.cell(row+1, ci, cnt)
+            nc.font = Font(name="Arial", bold=True, size=18, color=bg)
+            nc.fill = PatternFill("solid", fgColor=NC_MAP.get(bg, LT_TEAL))
+            nc.alignment = Alignment(horizontal="center", vertical="center")
+            nc.border = _b()
+        ws.row_dimensions[row].height = 26
+        ws.row_dimensions[row+1].height = 30
+        row += 2
+
+        # Section 2 sub-banner
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=6)
+        s2 = ws.cell(row, 1, "SECTION 2 — SAIPEM / CPY")
+        s2.font = Font(name="Arial", bold=True, size=9, color=WHITE)
+        s2.fill = PatternFill("solid", fgColor=TEAL)
+        s2.alignment = Alignment(horizontal="center", vertical="center")
+        ws.row_dimensions[row].height = 16
+        row += 1
+
+        sec2 = [("Not Submitted\nto CPY",   int(cc.get("Not Submitted to CPY",0)),  TAB_RED),
+                ("Under CPY\nReview",       int(cc.get("Under CPY Review",0)),       DK_BLUE),
+                ("Under\nConsolidation",    int(cc.get("Under Consolidation",0)),   DK_AMBER),
+                ("Pending\nwith Vendor",    int(cc.get("Pending with Vendor",0)),    ORANGE),
+                ("Code A\nCPY Approved",    int(cc.get("Code A — CPY Approved",0)), DK_GREEN),
+                ("Total\nDocuments",        n,                                       TEAL)]
+        for ci, (lbl, cnt, bg) in enumerate(sec2, 1):
+            lc = ws.cell(row, ci, lbl)
+            lc.font = Font(name="Arial", bold=True, size=8, color=WHITE)
+            lc.fill = PatternFill("solid", fgColor=bg)
+            lc.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            lc.border = _b()
+            nc = ws.cell(row+1, ci, cnt)
+            nc.font = Font(name="Arial", bold=True, size=18, color=bg)
+            nc.fill = PatternFill("solid", fgColor=NC_MAP.get(bg, LT_TEAL))
+            nc.alignment = Alignment(horizontal="center", vertical="center")
+            nc.border = _b()
+        ws.row_dimensions[row].height = 26
+        ws.row_dimensions[row+1].height = 30
+        row += 3  # 2 rows + 1 blank between POs
+
+
 # ── Main generator ───────────────────────────────────────────────────────────
 def generate_mvdr(raw_bytes):
     df=_read_mvdr(raw_bytes)
@@ -305,6 +405,8 @@ def generate_mvdr(raw_bytes):
     ws.cell(tr,11).value=int(cc.get("Pending with Vendor",0))
     ws.cell(tr,12).value=int(cc.get("Code A — CPY Approved",0))
     ws.row_dimensions[tr].height=18
+
+    _build_po_wise_tab(wb, df, date_str)
 
     _build_data_tab(wb,"ALL DOCUMENTS",      TEAL,    df,                                     LT_TEAL,  date_str)
     _build_data_tab(wb,"NOT SUBMITTED",      TAB_RED, df[df["_CS"]=="Not Submitted to CPY"],  LT_RED,   date_str)
