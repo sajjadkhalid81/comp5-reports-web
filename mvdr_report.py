@@ -155,7 +155,7 @@ def _make_kpi_section(ws,banner_row,label_row,count_row,banner_txt,kpis,col_pair
 # ── Data tab builder ─────────────────────────────────────────────────────────
 def _build_data_tab(wb,tab_name,tab_color,df_tab,alt_bg,date_str):
     ws=wb.create_sheet(tab_name); ws.sheet_properties.tabColor=tab_color; ws.freeze_panes="A4"
-    n=len(df_tab); NCOLS=17
+    n=len(df_tab); NCOLS=19
     ws.merge_cells(f"A1:{get_column_letter(NCOLS)}1"); t=ws["A1"]
     t.value=f"{tab_name.upper()}  |  COMP5 MVDR  |  {date_str}"
     t.font=Font(name="Arial",bold=True,size=11,color=WHITE)
@@ -167,11 +167,11 @@ def _build_data_tab(wb,tab_name,tab_color,df_tab,alt_bg,date_str):
     s.font=Font(name="Arial",italic=True,size=9,color=GREY)
     s.alignment=Alignment(horizontal="center",vertical="center")
     s.fill=PatternFill(fill_type=None); ws.row_dimensions[2].height=16
-    hdrs=["#","Client Doc No.","Saipem Doc No.","Vendor Doc No.","Document Title",
+    hdrs=["#","PO Number","Vendor","Client Doc No.","Saipem Doc No.","Vendor Doc No.","Document Title",
           "Doc Class","Current Rev.",
           "Vendor TR → Saipem","Date Rcvd","Saipem TR → Vendor","Date Returned","Saipem Code",
           "Saipem TR → CPY","Date to CPY","CPY TR → Saipem","Date from CPY","CPY Code"]
-    col_w=[4,28,28,22,42,9,8,22,12,22,12,20,22,12,22,12,22]
+    col_w=[4,13,20,28,28,22,42,9,8,22,12,22,12,20,22,12,22,12,22]
     for ci,(h,w) in enumerate(zip(hdrs,col_w),1):
         _h(ws,3,ci,h,bg=tab_color)
         ws.column_dimensions[get_column_letter(ci)].width=w
@@ -186,7 +186,8 @@ def _build_data_tab(wb,tab_name,tab_color,df_tab,alt_bg,date_str):
         vs=row.get("_VS",""); cs=row.get("_CS","")
         vs_bg,vs_fg=VEND_COLORS.get(vs,(WHITE,BLACK))
         cs_bg,cs_fg=CPY_COLORS.get(cs,(WHITE,BLACK))
-        vals=[ri-3,_fmt(row.get("Client Document No.","")),_fmt(row.get("Saipem Document No.","")),
+        vals=[ri-3,_fmt(row.get("_PO","")),_fmt(row.get("_VND","")),
+              _fmt(row.get("Client Document No.","")),_fmt(row.get("Saipem Document No.","")),
               _fmt(row.get("Vendor Document No.","")),_fmt(row.get("Document Title (All Caps)","")),
               _fmt(row.get("Doc. Class","")),_fmt(row.get("Current Rev.","")),
               _fmt(row.get("Trans INCOMING No..4","")),_fmt(row.get("Date Rcvd.4","")),
@@ -195,18 +196,18 @@ def _build_data_tab(wb,tab_name,tab_color,df_tab,alt_bg,date_str):
               _fmt(row.get("Trans INCOMING No..5","")),_fmt(row.get("Date Rcvd.5","")),cs]
         for ci,val in enumerate(vals,1):
             cell=ws.cell(row=ri,column=ci,value=val)
-            if ci==12:
+            if ci==14:
                 cell.fill=PatternFill("solid",fgColor=vs_bg)
                 cell.font=Font(name="Arial",bold=True,color=vs_fg,size=9)
                 cell.alignment=Alignment(horizontal="center",vertical="center")
-            elif ci==17:
+            elif ci==19:
                 cell.fill=PatternFill("solid",fgColor=cs_bg)
                 cell.font=Font(name="Arial",bold=True,color=cs_fg,size=9)
                 cell.alignment=Alignment(horizontal="center",vertical="center")
             else:
                 cell.fill=bg_fill
                 cell.font=Font(name="Arial",size=9,color=BLACK)
-                cell.alignment=Alignment(horizontal="center" if ci in [1,6,7] else "left",vertical="center")
+                cell.alignment=Alignment(horizontal="center" if ci in [1,2,8,9] else "left",vertical="center")
             try: cell.border=_b()
             except Exception: pass
         ws.row_dimensions[ri].height=14
