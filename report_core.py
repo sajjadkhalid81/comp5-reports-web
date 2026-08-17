@@ -66,12 +66,15 @@ def _b(med=False):
 def _c(ws, r, c, v="", bold=False, fg=BLACK, bg=None,
         align="left", wrap=False, sz=9, brd=True):
     cell = ws.cell(row=r, column=c, value=v)
-    cell.font      = Font(name="Arial", bold=bold, color=fg, size=sz)
-    cell.alignment = Alignment(horizontal=align, vertical="center", wrap_text=wrap)
-    if bg:
-        cell.fill = PatternFill("solid", fgColor=bg)
-    if brd:
-        cell.border = _b()
+    try:
+        cell.font      = Font(name="Arial", bold=bold, color=fg, size=sz)
+        cell.alignment = Alignment(horizontal=align, vertical="center", wrap_text=wrap)
+        if bg:
+            cell.fill = PatternFill("solid", fgColor=bg)
+        if brd:
+            cell.border = _b()
+    except Exception:
+        pass
     return cell
 
 def _h(ws, r, c, lbl, bg=DARK_BLUE, fg=WHITE, sz=9):
@@ -1123,11 +1126,50 @@ def _build_comp5_detail_tab(wb, tab_name, tab_color, df, alt_bg, report_date_str
         "UNDER CORRECTION/HOLD":    (AMBER,    "7F4000"),
     }
 
-    for ri, (_, row_data) in enumerate(df.iterrows(), 3):
-        bg = alt_bg if ri % 2 == 0 else WHITE
-        disc_code = str(row_data.get("Discipline","")).strip().upper()
+    # ── Pre-build shared style objects (created once, reused per cell) ────
+    _font_norm    = Font(name="Arial", bold=False, size=9)
+    _font_status  = {}   # keyed by sfg colour
+    _align_left   = Alignment(horizontal="left",   vertical="center")
+    _align_center = Alignment(horizontal="center", vertical="center")
+    _border       = _b()
+    _fill_cache   = {}
+    LEFT_COLS     = {2, 3, 5, 7, 10, 11}
+
+    def _get_fill(hex_color):
+        if hex_color not in _fill_cache:
+            _fill_cache[hex_color] = PatternFill("solid", fgColor=hex_color)
+        return _fill_cache[hex_color]
+
+    def _get_sfont(sfg):
+        if sfg not in _font_status:
+            _font_status[sfg] = Font(name="Arial", bold=True, color=sfg, size=9)
+        return _font_status[sfg]
+
+    # ── Pre-extract columns as lists (much faster than row_data.get per row) ─
+    def _col(df, *keys):
+        for k in keys:
+            if k in df.columns:
+                return df[k].fillna("").astype(str).tolist()
+        return [""] * len(df)
+
+    col_client = _col(df, "CLIENT DOCUMENT NO. with REV", "CLIENTDOCUMENTNO.")
+    col_saipem = _col(df, "Saipem Number","SaipemNumber","SAIPEM NUMBER","Saipem Doc No")
+    col_rev    = _col(df, "Rev")
+    col_title  = _col(df, "TITLE / DESCRIPTION","Title","TITLE")
+    col_disc   = _col(df, "Discipline")
+    col_itype  = _col(df, "Issuing Description")
+    col_date   = _col(df, "Date Issued")
+    col_tr     = _col(df, "Transmittal Reference","ENG TR","Eng TR","ENG_TR")
+    col_idc    = _col(df, "Issued by DC")
+    col_pcontr = _col(df, "PCON TR")
+    col_status = _col(df, status_col)
+
+    for idx in range(len(df)):
+        ri        = idx + 3
+        bg        = alt_bg if ri % 2 == 0 else WHITE
+        disc_code = col_disc[idx].strip().upper()
         disc_name = DISC_MAP.get(disc_code, disc_code)
-        status    = str(row_data.get(status_col,"")).strip()
+        status    = col_status[idx].strip()
         status_up = status.upper()
         if status_up in STATUS_COLORS:
             sbg, sfg = STATUS_COLORS[status_up]
@@ -1136,22 +1178,38 @@ def _build_comp5_detail_tab(wb, tab_name, tab_color, df, alt_bg, report_date_str
         else:
             sbg, sfg = (AMBER, "7F6000")
 
-        _c(ws, ri,  1, ri-2, bg=bg, align="center")
-        # Client doc no with rev
-        client_no = _g(row_data, "CLIENT DOCUMENT NO. with REV", "CLIENTDOCUMENTNO.")
-        _c(ws, ri,  2, client_no, bg=bg)
-        _c(ws, ri,  3, _g(row_data, "Saipem Number","SaipemNumber","SAIPEM NUMBER","Saipem Doc No"), bg=bg)
-        _c(ws, ri,  4, _g(row_data, "Rev"), bg=bg, align="center")
-        _c(ws, ri,  5, _g(row_data, "TITLE / DESCRIPTION","Title","TITLE"), bg=bg)
-        _c(ws, ri,  6, disc_code, bg=bg, align="center")
-        _c(ws, ri,  7, disc_name, bg=bg)
-        _c(ws, ri,  8, _g(row_data, "Issuing Description"), bg=bg, align="center")
-        _c(ws, ri,  9, _g(row_data, "Date Issued"), bg=bg, align="center")
-        _c(ws, ri, 10, _g(row_data, "Transmittal Reference","ENG TR","Eng TR","ENG_TR"), bg=bg)
-        _c(ws, ri, 11, _g(row_data, "Issued by DC"), bg=bg)
-        _c(ws, ri, 12, _g(row_data, "PCON TR"), bg=bg)
-        sc = _c(ws, ri, 13, status, bg=sbg, align="center", bold=True)
-        sc.font = Font(name="Arial", bold=True, color=sfg, size=9)
+        bg_fill     = _get_fill(bg)
+        status_fill = _get_fill(sbg)
+        sfont       = _get_sfont(sfg)
+
+        row_vals = [
+            idx + 1,
+            col_client[idx],
+            col_saipem[idx],
+            col_rev[idx],
+            col_title[idx],
+            disc_code,
+            disc_name,
+            col_itype[idx],
+            col_date[idx],
+            col_tr[idx],
+            col_idc[idx],
+            col_pcontr[idx],
+            status,
+        ]
+
+        for ci, val in enumerate(row_vals, 1):
+            try:
+                cell      = ws.cell(row=ri, column=ci, value=val)
+                # Minimal styling only — no border/alignment/font on data rows
+                # Critical for performance: 4600+ rows × 13 cols = 60k cells
+                if ci == 13:
+                    cell.font = sfont
+                    cell.fill = status_fill
+                else:
+                    cell.fill = bg_fill
+            except Exception:
+                pass
         ws.row_dimensions[ri].height = 14
 
 
