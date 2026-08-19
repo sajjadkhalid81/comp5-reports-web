@@ -162,6 +162,34 @@ def api_download_tbe():
         return str(e), 500
 
 
+@app.route("/api/mvdr/summary", methods=["POST"])
+def api_mvdr_summary():
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+    try:
+        from mvdr_report import summarise_mvdr
+        from datetime import datetime
+        summary = summarise_mvdr(request.files["file"].read())
+        fname = f"COMP5_MVDR_Report_{datetime.today().strftime('%d%b%Y').upper()}.xlsx"
+        return jsonify({"summary": summary, "filename": fname})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/mvdr/download", methods=["POST"])
+def api_download_mvdr():
+    if "file" not in request.files:
+        return "No file uploaded", 400
+    try:
+        from mvdr_report import generate_mvdr
+        result = generate_mvdr(request.files["file"].read())
+        return send_file(BytesIO(result["bytes"]),
+                         download_name=result["filename"],
+                         as_attachment=True, mimetype=XLSX_MIME)
+    except Exception as e:
+        return str(e), 500
+
+
 # ── Run ────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
