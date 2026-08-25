@@ -397,87 +397,161 @@ def _build_summary(wb, title, header_color,
 
 # ── Subcon / Partner summary tab ────────────────────────────────────────────
 
-def _build_subcon_tab(wb, tab_color,
+def _build_subcon_tab(wb, title, header_color,
                        issued, not_rep_v, not_rep_e, rep_closed, rep_open,
                        report_date_str):
     """
-    Standalone tab summarising documents by subcontractor/partner.
-    Detection: 'BMC' or 'OOE' substring anywhere in CLIENT DOCUMENT NO.
-    (SPM = Saipem / no match). Same 5-bucket breakdown as the SUMMARY
-    discipline table, plus a TOTAL column.
+    Full clone of the SUMMARY tab layout — title banner, 5 KPI boxes,
+    breakdown table + TOTAL row, Expired-Urgent table — grouped by
+    subcontractor/partner (SPM/BMC/OOE, detected by 'BMC'/'OOE' substring
+    anywhere in CLIENT DOCUMENT NO.) instead of by discipline.
     """
     ws = wb.create_sheet("SUBCON & PARTNER SUMMARY")
-    ws.sheet_properties.tabColor = tab_color
+    ws.sheet_properties.tabColor = header_color
 
-    # Row 1 — title banner
-    ws.merge_cells("A1:H1")
-    t = ws.cell(1, 1, f"SUBCON & PARTNER SUMMARY   |   COMP5 PROJECT   |   {report_date_str}")
-    t.font      = Font(name="Arial", bold=True, size=11, color=WHITE)
-    t.fill      = PatternFill("solid", fgColor=tab_color)
-    t.alignment = Alignment(horizontal="center", vertical="center")
-    ws.row_dimensions[1].height = 22
+    # Row 1: Title banner
+    ws.merge_cells("A1:F1")
+    c = ws["A1"]
+    c.value     = title
+    c.font      = Font(name="Arial", bold=True, size=14, color=WHITE)
+    c.fill      = PatternFill("solid", fgColor=header_color)
+    c.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 36
 
-    # Row 2 — detection note
-    ws.merge_cells("A2:H2")
-    note = ws.cell(2, 1,
-        "Derived from 'BMC' / 'OOE' found anywhere in CLIENT DOCUMENT NO. "
-        "— SPM = Saipem (Main Contractor) / no match")
-    note.font      = Font(name="Arial", italic=True, size=9, color=GREY595)
-    note.alignment = Alignment(horizontal="center", vertical="center")
-    ws.row_dimensions[2].height = 16
+    # Row 2: Report date
+    ws.merge_cells("A2:F2")
+    d = ws["A2"]
+    d.value     = f"Report Date: {report_date_str}"
+    d.font      = Font(name="Arial", italic=True, size=10, color=GREY595)
+    d.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[2].height = 18
 
-    HDR_ROW = 4
+    # ── 5 KPI boxes (row 4 = label, row 5 = count) — identical to SUMMARY ──
+    nc_bg_map = {
+        MR_COLOR:   "D6EEF1",
+        TBE_COLOR:  "E8DFFF",
+        TAB_GREEN:  "C6EFCE",
+        TAB_RED:    "FFCCCC",
+        TAB_GREY:   "E0E0E0",
+        TAB_PURPLE: "EAD1FF",
+    }
+    kpis = [
+        ("ISSUED\n(to CPY)",           len(issued),    header_color),
+        ("NOT REPLIED\n(Not Expired)", len(not_rep_v), TAB_GREEN),
+        ("NOT REPLIED\n(Expired)",     len(not_rep_e), TAB_RED),
+        ("REPLIED\nCLOSED",            len(rep_closed), TAB_GREY),
+        ("REPLIED\nOPEN",              len(rep_open),  TAB_PURPLE),
+    ]
+    for i, (label, count, bg) in enumerate(kpis, 1):
+        lc = ws.cell(4, i, label)
+        lc.font      = Font(name="Arial", bold=True, size=10, color=WHITE)
+        lc.fill      = PatternFill("solid", fgColor=bg)
+        lc.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        lc.border    = _b()
+        nc = ws.cell(5, i, count)
+        nc.font      = Font(name="Arial", bold=True, size=28, color=bg)
+        nc.fill      = PatternFill("solid", fgColor=nc_bg_map.get(bg, "EBF3FB"))
+        nc.alignment = Alignment(horizontal="center", vertical="center")
+        nc.border    = _b()
+
+    for col in range(1, 7):
+        ws.column_dimensions[get_column_letter(col)].width = 20
+    ws.row_dimensions[4].height = 32
+    ws.row_dimensions[5].height = 44
+
+    # ── Subcon / Partner breakdown banner ──
+    ws.merge_cells("A7:F7")
+    banner = ws.cell(7, 1, "SUBCON / PARTNER BREAKDOWN")
+    banner.font      = Font(name="Arial", bold=True, size=11, color=WHITE)
+    banner.fill      = PatternFill("solid", fgColor=header_color)
+    banner.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[7].height = 20
+
+    HDR_ROW = 8
     headers = [
-        "Code", "Company", "ISSUED\n(to CPY)", "NOT REPLIED\n(Not Exp.)",
-        "NOT REPLIED\n(Expired)", "REPLIED\nCLOSED", "REPLIED\nOPEN", "TOTAL"
+        "Subcon / Partner", "ISSUED\n(to CPY)", "NOT REPLIED\n(Not Exp.)",
+        "NOT REPLIED\n(Expired)", "REPLIED\nCLOSED", "REPLIED\nOPEN"
     ]
     for ci, h in enumerate(headers, 1):
-        _h(ws, HDR_ROW, ci, h, bg=tab_color)
+        _h(ws, HDR_ROW, ci, h, bg=header_color)
     ws.row_dimensions[HDR_ROW].height = 30
-    for ci, w in enumerate([10, 32, 14, 15, 14, 12, 12, 10], 1):
-        ws.column_dimensions[get_column_letter(ci)].width = w
 
     def get_sc(df_):
         return df_["_SUBCON"].astype(str).str.strip() if "_SUBCON" in df_.columns else pd.Series(dtype=str)
 
     ALT = "EBF3FB"
-    ri = HDR_ROW
-    for code in SUBCON_ORDER:
-        ri += 1
+    for ri, code in enumerate(SUBCON_ORDER, HDR_ROW + 1):
         bg = ALT if ri % 2 == 0 else WHITE
 
         def cnt(df_, c=code):
             s = get_sc(df_)
             return int((s == c).sum()) if len(s) else 0
 
-        i_cnt, v_cnt, e_cnt, rc_cnt, ro_cnt = (
-            cnt(issued), cnt(not_rep_v), cnt(not_rep_e), cnt(rep_closed), cnt(rep_open)
-        )
-        _c(ws, ri, 1, code,                       bg=bg, align="center", bold=True)
-        _c(ws, ri, 2, SUBCON_MAP.get(code, code),  bg=bg)
-        _c(ws, ri, 3, i_cnt,                       bg=bg, align="center")
-        _c(ws, ri, 4, v_cnt,                       bg=bg, align="center")
-        ec = _c(ws, ri, 5, e_cnt, bg="FFCCCC" if e_cnt > 0 else bg, align="center")
-        if e_cnt > 0:
+        label   = SUBCON_MAP.get(code, code)
+        exp_cnt = cnt(not_rep_e)
+        _c(ws, ri, 1, label,           bg=bg)
+        _c(ws, ri, 2, cnt(issued),     bg=bg, align="center")
+        _c(ws, ri, 3, cnt(not_rep_v),  bg=bg, align="center")
+        ec = _c(ws, ri, 4, exp_cnt,
+                bg="FFCCCC" if exp_cnt > 0 else bg, align="center")
+        if exp_cnt > 0:
             ec.font = Font(name="Arial", bold=True, color="C00000", size=9)
-        _c(ws, ri, 6, rc_cnt, bg=bg, align="center")
-        oc = _c(ws, ri, 7, ro_cnt, bg="EAD1FF" if ro_cnt > 0 else bg, align="center")
-        if ro_cnt > 0:
+        _c(ws, ri, 5, cnt(rep_closed), bg=bg, align="center")
+        op_cnt = cnt(rep_open)
+        oc = _c(ws, ri, 6, op_cnt,
+                bg="EAD1FF" if op_cnt > 0 else bg, align="center")
+        if op_cnt > 0:
             oc.font = Font(name="Arial", bold=True, color=TAB_PURPLE, size=9)
-        _c(ws, ri, 8, i_cnt, bg=bg, align="center", bold=True)
-        ws.row_dimensions[ri].height = 26
+        ws.row_dimensions[ri].height = 14
 
-    total_row = ri + 1
-    ws.merge_cells(start_row=total_row, start_column=1, end_row=total_row, end_column=2)
-    _c(ws, total_row, 1, "TOTAL", bg=tab_color, bold=True, fg=WHITE, align="center")
-    _c(ws, total_row, 3, len(issued),    bg=tab_color, bold=True, fg=WHITE, align="center")
-    _c(ws, total_row, 4, len(not_rep_v), bg=tab_color, bold=True, fg=WHITE, align="center")
-    _c(ws, total_row, 5, len(not_rep_e),
-       bg="C00000" if len(not_rep_e) > 0 else tab_color, bold=True, fg=WHITE, align="center")
-    _c(ws, total_row, 6, len(rep_closed), bg=tab_color, bold=True, fg=WHITE, align="center")
-    _c(ws, total_row, 7, len(rep_open),   bg=tab_color, bold=True, fg=WHITE, align="center")
-    _c(ws, total_row, 8, len(issued),     bg=tab_color, bold=True, fg=WHITE, align="center")
+    # TOTAL row
+    total_row = HDR_ROW + len(SUBCON_ORDER) + 1
+    _c(ws, total_row, 1, "TOTAL",          bg=header_color, bold=True, fg=WHITE, align="center")
+    _c(ws, total_row, 2, len(issued),      bg=header_color, bold=True, fg=WHITE, align="center")
+    _c(ws, total_row, 3, len(not_rep_v),   bg=header_color, bold=True, fg=WHITE, align="center")
+    _c(ws, total_row, 4, len(not_rep_e),
+       bg="C00000" if len(not_rep_e) > 0 else header_color,
+       bold=True, fg=WHITE, align="center")
+    _c(ws, total_row, 5, len(rep_closed),  bg=header_color, bold=True, fg=WHITE, align="center")
+    _c(ws, total_row, 6, len(rep_open),    bg=header_color, bold=True, fg=WHITE, align="center")
     ws.row_dimensions[total_row].height = 18
+
+    # ── Expired urgent table (identical to SUMMARY tab) ──
+    if len(not_rep_e) > 0:
+        urg_row = total_row + 3
+        ws.merge_cells(f"A{urg_row}:G{urg_row}")
+        urg = ws.cell(urg_row, 1, "\u26a0  EXPIRED — URGENT ACTION REQUIRED")
+        urg.font      = Font(name="Arial", bold=True, size=11, color=WHITE)
+        urg.fill      = PatternFill("solid", fgColor="C00000")
+        urg.alignment = Alignment(horizontal="center", vertical="center")
+        ws.row_dimensions[urg_row].height = 22
+
+        for ci, h in enumerate(
+            ["#", "Document No.", "Document Title", "Discipline",
+             "Date Issued to CPY", "Due Date", "Days Overdue"], 1
+        ):
+            _h(ws, urg_row + 1, ci, h, bg="C00000")
+        ws.column_dimensions[get_column_letter(3)].width = 45
+        ws.row_dimensions[urg_row + 1].height = 20
+
+        exp_sorted = not_rep_e.sort_values("RESPONSE DUE DATE")
+        for ri2, (_, row_data) in enumerate(exp_sorted.iterrows(), urg_row + 2):
+            due       = pd.to_datetime(row_data.get("RESPONSE DUE DATE"), errors="coerce")
+            issued_dt = pd.to_datetime(row_data.get("DATE"), errors="coerce")
+            days_over = row_data.get("Days Overdue", "")
+            disc_name = DISC_MAP.get(str(row_data.get("_DISC","")).strip(), str(row_data.get("_DISC","")))
+
+            _c(ws, ri2, 1, ri2 - (urg_row + 1),                              bg="FFCCCC", align="center", bold=True)
+            _c(ws, ri2, 2, _fmt(row_data.get("CLIENT DOCUMENT NO.","")),      bg="FFCCCC")
+            _c(ws, ri2, 3, _fmt(row_data.get("DOCUMENT TITLE","")),           bg="FFCCCC", wrap=True)
+            _c(ws, ri2, 4, disc_name,                                         bg="FFCCCC", align="center")
+            _c(ws, ri2, 5, _fmt(issued_dt),                                   bg="FFCCCC", align="center")
+            _c(ws, ri2, 6, _fmt(due),                                         bg="FFCCCC", align="center")
+            ov = _c(ws, ri2, 7,
+                    f"OVERDUE {days_over}d" if days_over != "" else "",
+                    bg="FFCCCC", align="center")
+            ov.font = Font(name="Arial", bold=True, color="C00000", size=9)
+            ws.row_dimensions[ri2].height = 14
 
 
 # ── Data tab ───────────────────────────────────────────────────────────────
@@ -598,10 +672,15 @@ def generate_mr(raw: bytes) -> dict:
         rep_open        = rep_open,
         report_date_str = report_date_str,
     )
-    _build_subcon_tab(wb, MR_COLOR,
-        issued=issued, not_rep_v=not_rep_v, not_rep_e=not_rep_e,
-        rep_closed=rep_closed, rep_open=rep_open,
-        report_date_str=report_date_str,
+    _build_subcon_tab(wb,
+        title           = "MATERIAL REQUISITIONS (MR) | SUBCON & PARTNER SUMMARY",
+        header_color    = MR_COLOR,
+        issued          = issued,
+        not_rep_v       = not_rep_v,
+        not_rep_e       = not_rep_e,
+        rep_closed      = rep_closed,
+        rep_open        = rep_open,
+        report_date_str = report_date_str,
     )
     _build_data_tab(wb, "ALL ISSUED",               MR_COLOR,  MR_ALT,   issued)
     _build_data_tab(wb, "NOT REPLIED (Not Expired)", TAB_GREEN, "C6EFCE", not_rep_v, extra_col="Days Remaining")
@@ -643,10 +722,15 @@ def generate_tbe(raw: bytes) -> dict:
         rep_open        = rep_open,
         report_date_str = report_date_str,
     )
-    _build_subcon_tab(wb, TBE_COLOR,
-        issued=issued, not_rep_v=not_rep_v, not_rep_e=not_rep_e,
-        rep_closed=rep_closed, rep_open=rep_open,
-        report_date_str=report_date_str,
+    _build_subcon_tab(wb,
+        title           = "TBE (TECHNICAL BID EVALUATION) | SUBCON & PARTNER SUMMARY",
+        header_color    = TBE_COLOR,
+        issued          = issued,
+        not_rep_v       = not_rep_v,
+        not_rep_e       = not_rep_e,
+        rep_closed      = rep_closed,
+        rep_open        = rep_open,
+        report_date_str = report_date_str,
     )
     _build_data_tab(wb, "ALL ISSUED",               TBE_COLOR, TBE_ALT,  issued)
     _build_data_tab(wb, "NOT REPLIED (Not Expired)", TAB_GREEN, "C6EFCE", not_rep_v, extra_col="Days Remaining")
