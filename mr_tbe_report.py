@@ -527,24 +527,30 @@ def _build_subcon_tab(wb, title, header_color,
     _c(ws, total_row, 6, len(rep_open),    bg=header_color, bold=True, fg=WHITE, align="center")
     ws.row_dimensions[total_row].height = 18
 
-    # ── Expired urgent table (identical to SUMMARY tab) ──
-    if len(not_rep_e) > 0:
-        urg_row = total_row + 3
-        ws.merge_cells(f"A{urg_row}:G{urg_row}")
-        urg = ws.cell(urg_row, 1, "\u26a0  EXPIRED — URGENT ACTION REQUIRED")
-        urg.font      = Font(name="Arial", bold=True, size=11, color=WHITE)
-        urg.fill      = PatternFill("solid", fgColor="C00000")
-        urg.alignment = Alignment(horizontal="center", vertical="center")
-        ws.row_dimensions[urg_row].height = 22
+    # ── Expired urgent table — always shown on this tab, even with 0 rows ──
+    urg_row = total_row + 3
+    ws.merge_cells(f"A{urg_row}:G{urg_row}")
+    urg = ws.cell(urg_row, 1, "\u26a0  EXPIRED — URGENT ACTION REQUIRED")
+    urg.font      = Font(name="Arial", bold=True, size=11, color=WHITE)
+    urg.fill      = PatternFill("solid", fgColor="C00000")
+    urg.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[urg_row].height = 22
 
-        for ci, h in enumerate(
-            ["#", "Document No.", "Document Title", "Discipline",
-             "Date Issued to CPY", "Due Date", "Days Overdue"], 1
-        ):
-            _h(ws, urg_row + 1, ci, h, bg="C00000")
-        ws.column_dimensions[get_column_letter(3)].width = 45
-        ws.row_dimensions[urg_row + 1].height = 20
+    for ci, h in enumerate(
+        ["#", "Document No.", "Document Title", "Discipline",
+         "Date Issued to CPY", "Due Date", "Days Overdue"], 1
+    ):
+        _h(ws, urg_row + 1, ci, h, bg="C00000")
+    ws.column_dimensions[get_column_letter(3)].width = 45
+    ws.row_dimensions[urg_row + 1].height = 20
 
+    if len(not_rep_e) == 0:
+        ws.merge_cells(start_row=urg_row + 2, start_column=1, end_row=urg_row + 2, end_column=7)
+        none_cell = ws.cell(urg_row + 2, 1, "No BOMSEC/COOEC documents currently overdue")
+        none_cell.font      = Font(name="Arial", italic=True, color=GREY595, size=9)
+        none_cell.alignment = Alignment(horizontal="center", vertical="center")
+        ws.row_dimensions[urg_row + 2].height = 18
+    else:
         exp_sorted = not_rep_e.sort_values("RESPONSE DUE DATE")
         for ri2, (_, row_data) in enumerate(exp_sorted.iterrows(), urg_row + 2):
             due       = pd.to_datetime(row_data.get("RESPONSE DUE DATE"), errors="coerce")
