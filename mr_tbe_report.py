@@ -87,6 +87,7 @@ SUBCON_MAP = {
     "OOE": "COOEC",
 }
 SUBCON_ORDER = ["SPM", "BMC", "OOE"]
+PARTNER_ORDER = ["BMC", "OOE"]  # BOMSEC & COOEC only — excludes SPM (main contractor)
 
 DATA_COLS = [
     "#",
@@ -402,11 +403,21 @@ def _build_subcon_tab(wb, title, header_color,
                        report_date_str):
     """
     Full clone of the SUMMARY tab layout — title banner, 5 KPI boxes,
-    breakdown table + TOTAL row, Expired-Urgent table — grouped by
-    subcontractor/partner (SPM/BMC/OOE, detected by 'BMC'/'OOE' substring
-    anywhere in CLIENT DOCUMENT NO.) instead of by discipline.
+    breakdown table + TOTAL row, Expired-Urgent table — restricted to
+    BOMSEC (BMC) & COOEC (OOE) documents only. SPM (Saipem, main
+    contractor) is excluded from every section of this tab: KPI boxes,
+    breakdown table, and the Expired-Urgent table all recompute off the
+    BMC/OOE-only subset. Detection: 'BMC'/'OOE' substring anywhere in
+    CLIENT DOCUMENT NO.
     """
-    ws = wb.create_sheet("SUBCON & PARTNER SUMMARY")
+    is_partner = lambda df_: df_["_SUBCON"].isin(PARTNER_ORDER) if "_SUBCON" in df_.columns else pd.Series(False, index=df_.index)
+    issued     = issued[is_partner(issued)]
+    not_rep_v  = not_rep_v[is_partner(not_rep_v)]
+    not_rep_e  = not_rep_e[is_partner(not_rep_e)]
+    rep_closed = rep_closed[is_partner(rep_closed)]
+    rep_open   = rep_open[is_partner(rep_open)]
+
+    ws = wb.create_sheet("BOMSEC & COOEC")
     ws.sheet_properties.tabColor = header_color
 
     # Row 1: Title banner
@@ -461,7 +472,7 @@ def _build_subcon_tab(wb, title, header_color,
 
     # ── Subcon / Partner breakdown banner ──
     ws.merge_cells("A7:F7")
-    banner = ws.cell(7, 1, "SUBCON / PARTNER BREAKDOWN")
+    banner = ws.cell(7, 1, "BOMSEC & COOEC BREAKDOWN")
     banner.font      = Font(name="Arial", bold=True, size=11, color=WHITE)
     banner.fill      = PatternFill("solid", fgColor=header_color)
     banner.alignment = Alignment(horizontal="center", vertical="center")
@@ -480,7 +491,7 @@ def _build_subcon_tab(wb, title, header_color,
         return df_["_SUBCON"].astype(str).str.strip() if "_SUBCON" in df_.columns else pd.Series(dtype=str)
 
     ALT = "EBF3FB"
-    for ri, code in enumerate(SUBCON_ORDER, HDR_ROW + 1):
+    for ri, code in enumerate(PARTNER_ORDER, HDR_ROW + 1):
         bg = ALT if ri % 2 == 0 else WHITE
 
         def cnt(df_, c=code):
@@ -505,7 +516,7 @@ def _build_subcon_tab(wb, title, header_color,
         ws.row_dimensions[ri].height = 14
 
     # TOTAL row
-    total_row = HDR_ROW + len(SUBCON_ORDER) + 1
+    total_row = HDR_ROW + len(PARTNER_ORDER) + 1
     _c(ws, total_row, 1, "TOTAL",          bg=header_color, bold=True, fg=WHITE, align="center")
     _c(ws, total_row, 2, len(issued),      bg=header_color, bold=True, fg=WHITE, align="center")
     _c(ws, total_row, 3, len(not_rep_v),   bg=header_color, bold=True, fg=WHITE, align="center")
@@ -673,7 +684,7 @@ def generate_mr(raw: bytes) -> dict:
         report_date_str = report_date_str,
     )
     _build_subcon_tab(wb,
-        title           = "MATERIAL REQUISITIONS (MR) | SUBCON & PARTNER SUMMARY",
+        title           = "MATERIAL REQUISITIONS (MR) | BOMSEC & COOEC",
         header_color    = MR_COLOR,
         issued          = issued,
         not_rep_v       = not_rep_v,
@@ -723,7 +734,7 @@ def generate_tbe(raw: bytes) -> dict:
         report_date_str = report_date_str,
     )
     _build_subcon_tab(wb,
-        title           = "TBE (TECHNICAL BID EVALUATION) | SUBCON & PARTNER SUMMARY",
+        title           = "TBE (TECHNICAL BID EVALUATION) | BOMSEC & COOEC",
         header_color    = TBE_COLOR,
         issued          = issued,
         not_rep_v       = not_rep_v,
