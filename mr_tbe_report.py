@@ -79,6 +79,15 @@ DISC_MAP = {
     "ST":"Structural",             "TC":"Telecommunications",
 }
 
+# Subcontractor / partner — detected by substring anywhere in CLIENT DOCUMENT NO.
+# SPM = Saipem (Main Contractor) = default when neither BMC nor OOE is found.
+SUBCON_MAP = {
+    "SPM": "Saipem (Main Contractor)",
+    "BMC": "BOMSEC",
+    "OOE": "COOEC",
+}
+SUBCON_ORDER = ["SPM", "BMC", "OOE"]
+
 DATA_COLS = [
     "#",
     "Document No. (with Rev)",
@@ -157,6 +166,16 @@ def _read_reference(raw: bytes) -> pd.DataFrame:
         )
     else:
         df["_DISC"] = "XX"
+
+    # Extract subcon/partner — 'BMC' or 'OOE' substring anywhere in the doc
+    # number; anything else (incl. no match) is the main contractor 'SPM'.
+    if doc_col in df.columns:
+        _su = df[doc_col].astype(str).str.upper()
+        df["_SUBCON"] = "SPM"
+        df.loc[_su.str.contains("BMC", na=False), "_SUBCON"] = "BMC"
+        df.loc[_su.str.contains("OOE", na=False), "_SUBCON"] = "OOE"
+    else:
+        df["_SUBCON"] = "SPM"
     return df
 
 
@@ -376,6 +395,91 @@ def _build_summary(wb, title, header_color,
             ws.row_dimensions[ri2].height = 14
 
 
+# ── Subcon / Partner summary tab ────────────────────────────────────────────
+
+def _build_subcon_tab(wb, tab_color,
+                       issued, not_rep_v, not_rep_e, rep_closed, rep_open,
+                       report_date_str):
+    """
+    Standalone tab summarising documents by subcontractor/partner.
+    Detection: 'BMC' or 'OOE' substring anywhere in CLIENT DOCUMENT NO.
+    (SPM = Saipem / no match). Same 5-bucket breakdown as the SUMMARY
+    discipline table, plus a TOTAL column.
+    """
+    ws = wb.create_sheet("SUBCON & PARTNER SUMMARY")
+    ws.sheet_properties.tabColor = tab_color
+
+    # Row 1 — title banner
+    ws.merge_cells("A1:H1")
+    t = ws.cell(1, 1, f"SUBCON & PARTNER SUMMARY   |   COMP5 PROJECT   |   {report_date_str}")
+    t.font      = Font(name="Arial", bold=True, size=11, color=WHITE)
+    t.fill      = PatternFill("solid", fgColor=tab_color)
+    t.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 22
+
+    # Row 2 — detection note
+    ws.merge_cells("A2:H2")
+    note = ws.cell(2, 1,
+        "Derived from 'BMC' / 'OOE' found anywhere in CLIENT DOCUMENT NO. "
+        "— SPM = Saipem (Main Contractor) / no match")
+    note.font      = Font(name="Arial", italic=True, size=9, color=GREY595)
+    note.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[2].height = 16
+
+    HDR_ROW = 4
+    headers = [
+        "Code", "Company", "ISSUED\n(to CPY)", "NOT REPLIED\n(Not Exp.)",
+        "NOT REPLIED\n(Expired)", "REPLIED\nCLOSED", "REPLIED\nOPEN", "TOTAL"
+    ]
+    for ci, h in enumerate(headers, 1):
+        _h(ws, HDR_ROW, ci, h, bg=tab_color)
+    ws.row_dimensions[HDR_ROW].height = 30
+    for ci, w in enumerate([10, 32, 14, 15, 14, 12, 12, 10], 1):
+        ws.column_dimensions[get_column_letter(ci)].width = w
+
+    def get_sc(df_):
+        return df_["_SUBCON"].astype(str).str.strip() if "_SUBCON" in df_.columns else pd.Series(dtype=str)
+
+    ALT = "EBF3FB"
+    ri = HDR_ROW
+    for code in SUBCON_ORDER:
+        ri += 1
+        bg = ALT if ri % 2 == 0 else WHITE
+
+        def cnt(df_, c=code):
+            s = get_sc(df_)
+            return int((s == c).sum()) if len(s) else 0
+
+        i_cnt, v_cnt, e_cnt, rc_cnt, ro_cnt = (
+            cnt(issued), cnt(not_rep_v), cnt(not_rep_e), cnt(rep_closed), cnt(rep_open)
+        )
+        _c(ws, ri, 1, code,                       bg=bg, align="center", bold=True)
+        _c(ws, ri, 2, SUBCON_MAP.get(code, code),  bg=bg)
+        _c(ws, ri, 3, i_cnt,                       bg=bg, align="center")
+        _c(ws, ri, 4, v_cnt,                       bg=bg, align="center")
+        ec = _c(ws, ri, 5, e_cnt, bg="FFCCCC" if e_cnt > 0 else bg, align="center")
+        if e_cnt > 0:
+            ec.font = Font(name="Arial", bold=True, color="C00000", size=9)
+        _c(ws, ri, 6, rc_cnt, bg=bg, align="center")
+        oc = _c(ws, ri, 7, ro_cnt, bg="EAD1FF" if ro_cnt > 0 else bg, align="center")
+        if ro_cnt > 0:
+            oc.font = Font(name="Arial", bold=True, color=TAB_PURPLE, size=9)
+        _c(ws, ri, 8, i_cnt, bg=bg, align="center", bold=True)
+        ws.row_dimensions[ri].height = 26
+
+    total_row = ri + 1
+    ws.merge_cells(start_row=total_row, start_column=1, end_row=total_row, end_column=2)
+    _c(ws, total_row, 1, "TOTAL", bg=tab_color, bold=True, fg=WHITE, align="center")
+    _c(ws, total_row, 3, len(issued),    bg=tab_color, bold=True, fg=WHITE, align="center")
+    _c(ws, total_row, 4, len(not_rep_v), bg=tab_color, bold=True, fg=WHITE, align="center")
+    _c(ws, total_row, 5, len(not_rep_e),
+       bg="C00000" if len(not_rep_e) > 0 else tab_color, bold=True, fg=WHITE, align="center")
+    _c(ws, total_row, 6, len(rep_closed), bg=tab_color, bold=True, fg=WHITE, align="center")
+    _c(ws, total_row, 7, len(rep_open),   bg=tab_color, bold=True, fg=WHITE, align="center")
+    _c(ws, total_row, 8, len(issued),     bg=tab_color, bold=True, fg=WHITE, align="center")
+    ws.row_dimensions[total_row].height = 18
+
+
 # ── Data tab ───────────────────────────────────────────────────────────────
 
 def _build_data_tab(wb, tab_name, tab_color, alt_bg, df, extra_col=None):
@@ -494,6 +598,11 @@ def generate_mr(raw: bytes) -> dict:
         rep_open        = rep_open,
         report_date_str = report_date_str,
     )
+    _build_subcon_tab(wb, MR_COLOR,
+        issued=issued, not_rep_v=not_rep_v, not_rep_e=not_rep_e,
+        rep_closed=rep_closed, rep_open=rep_open,
+        report_date_str=report_date_str,
+    )
     _build_data_tab(wb, "ALL ISSUED",               MR_COLOR,  MR_ALT,   issued)
     _build_data_tab(wb, "NOT REPLIED (Not Expired)", TAB_GREEN, "C6EFCE", not_rep_v, extra_col="Days Remaining")
     _build_data_tab(wb, "NOT REPLIED (Expired)",     TAB_RED,   "FFE0E0", not_rep_e, extra_col="Days Overdue")
@@ -533,6 +642,11 @@ def generate_tbe(raw: bytes) -> dict:
         rep_closed      = rep_closed,
         rep_open        = rep_open,
         report_date_str = report_date_str,
+    )
+    _build_subcon_tab(wb, TBE_COLOR,
+        issued=issued, not_rep_v=not_rep_v, not_rep_e=not_rep_e,
+        rep_closed=rep_closed, rep_open=rep_open,
+        report_date_str=report_date_str,
     )
     _build_data_tab(wb, "ALL ISSUED",               TBE_COLOR, TBE_ALT,  issued)
     _build_data_tab(wb, "NOT REPLIED (Not Expired)", TAB_GREEN, "C6EFCE", not_rep_v, extra_col="Days Remaining")
