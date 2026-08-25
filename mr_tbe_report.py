@@ -154,7 +154,11 @@ def _wb_bytes(wb):
 
 def _read_reference(raw: bytes) -> pd.DataFrame:
     df = pd.read_excel(BytesIO(raw), sheet_name="Reference", header=0)
-    df.columns = [str(c).strip() for c in df.columns]
+    # Collapse ALL whitespace (incl. embedded newlines from wrapped Excel
+    # header cells, e.g. "TRANSMITTAL FROM\nCOMPANY") to single spaces —
+    # .strip() alone only trims the ends and misses internal newlines,
+    # which silently broke every .get("TRANSMITTAL FROM COMPANY") lookup.
+    df.columns = [" ".join(str(c).split()) for c in df.columns]
     for col in ["DATE", "RESPONSE DUE DATE", "DATE REPLIED"]:
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], errors="coerce")
