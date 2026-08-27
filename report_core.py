@@ -429,14 +429,15 @@ def _build_tqsdr_summary(wb, title, header_color, kpis, disc_col,
     # Expired urgent table (only if expired records exist)
     if len(not_rep_e) > 0 and disc_col and disc_col in not_rep_e.columns:
         urgent_row = DISC_HDR_ROW + len(all_discs) + 3
-        ws.merge_cells(f"A{urgent_row}:G{urgent_row}")
+        ws.merge_cells(f"A{urgent_row}:H{urgent_row}")
         urg = ws.cell(urgent_row, 1, "⚠  EXPIRED — URGENT ACTION REQUIRED")
         urg.font      = Font(name="Arial", bold=True, size=11, color=WHITE)
         urg.fill      = PatternFill("solid", fgColor="C00000")
         urg.alignment = Alignment(horizontal="center", vertical="center")
         ws.row_dimensions[urgent_row].height = 22
-        for ci, h in enumerate(["#","Document Number","Discipline","Engineer","Date Issued to CPY","Due Date","Days Overdue"], 1):
+        for ci, h in enumerate(["#","Document Number","Title","Discipline","Engineer","Date Issued to CPY","Due Date","Days Overdue"], 1):
             _h(ws, urgent_row+1, ci, h, bg="C00000")
+        ws.column_dimensions[get_column_letter(7)].width = 15  # Due Date (shifted right by the new Title column)
         doc_col_name = "Document Number"
         ue_cols = ["Document Number","Discipline","RESPOND DUE DATE","DATE REPLIED","Responsible Engineer"]
         for ri2, (_, row_data) in enumerate(not_rep_e.iterrows(), urgent_row+2):
@@ -451,11 +452,12 @@ def _build_tqsdr_summary(wb, title, header_color, kpis, disc_col,
                 except (ValueError, AttributeError): pass
             _c(ws, ri2, 1, ri2-(urgent_row+1), bg="FFCCCC", align="center", bold=True)
             _c(ws, ri2, 2, _fmt(row_data.get("Document Number","")),  bg="FFCCCC")
-            _c(ws, ri2, 3, _fmt(row_data.get("Discipline","")),        bg="FFCCCC", align="center")
-            _c(ws, ri2, 4, _fmt(row_data.get("Responsible Engineer","")), bg="FFCCCC")
-            _c(ws, ri2, 5, issued_fmt,                                 bg="FFCCCC", align="center")
-            _c(ws, ri2, 6, due_fmt,                                    bg="FFCCCC", align="center")
-            ov_cell = _c(ws, ri2, 7, f"OVERDUE {days_over}d" if days_over != "" else "", bg="FFCCCC", align="center")
+            _c(ws, ri2, 3, _fmt(row_data.get("Title","")),             bg="FFCCCC")
+            _c(ws, ri2, 4, _fmt(row_data.get("Discipline","")),        bg="FFCCCC", align="center")
+            _c(ws, ri2, 5, _fmt(row_data.get("Responsible Engineer","")), bg="FFCCCC")
+            _c(ws, ri2, 6, issued_fmt,                                 bg="FFCCCC", align="center")
+            _c(ws, ri2, 7, due_fmt,                                    bg="FFCCCC", align="center")
+            ov_cell = _c(ws, ri2, 8, f"OVERDUE {days_over}d" if days_over != "" else "", bg="FFCCCC", align="center")
             ov_cell.font = Font(name="Arial", bold=True, color="C00000", size=9)
             ws.row_dimensions[ri2].height = 14
 
